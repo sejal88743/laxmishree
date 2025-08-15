@@ -39,6 +39,7 @@ export default function AddEfficiencyRecordPage() {
   const [isScanning, setIsScanning] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -252,7 +253,7 @@ export default function AddEfficiencyRecordPage() {
                   render={({ field }) => (
                     <FormItem className="flex flex-col">
                       <FormLabel className={formLabelStyle}>Date</FormLabel>
-                      <Popover>
+                      <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
                         <PopoverTrigger asChild>
                           <FormControl>
                             <Button variant="outline" className={cn('pl-3 text-left font-normal h-9', !field.value && 'text-muted-foreground')}>
@@ -262,7 +263,14 @@ export default function AddEfficiencyRecordPage() {
                           </FormControl>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar mode="single" selected={field.value} onSelect={field.onChange} />
+                          <Calendar 
+                            mode="single" 
+                            selected={field.value} 
+                            onSelect={(date) => {
+                                field.onChange(date);
+                                setIsDatePickerOpen(false);
+                            }}
+                          />
                         </PopoverContent>
                       </Popover>
                       <FormMessage />

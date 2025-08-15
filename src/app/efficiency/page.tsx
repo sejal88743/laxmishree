@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils';
 export default function EfficiencyPage() {
   const { records, deleteRecord, settings } = useAppState();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   
   const handleWhatsAppShare = (record: CalculatedLoomRecord) => {
     if (!settings.whatsAppNumber) {
@@ -136,7 +137,7 @@ export default function EfficiencyPage() {
   return (
     <div className="p-2 space-y-4">
       <div className="flex justify-between items-center gap-2">
-        <Popover>
+        <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
           <PopoverTrigger asChild>
             <Button variant="outline" className="w-full justify-start text-left font-normal bg-card">
               <CalendarIcon className="mr-2 h-4 w-4" />
@@ -147,7 +148,10 @@ export default function EfficiencyPage() {
             <Calendar
               mode="single"
               selected={selectedDate}
-              onSelect={(date) => date && setSelectedDate(date)}
+              onSelect={(date) => {
+                  if(date) setSelectedDate(date);
+                  setIsDatePickerOpen(false);
+              }}
               initialFocus
             />
           </PopoverContent>
