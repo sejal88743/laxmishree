@@ -55,7 +55,22 @@ export default function SettingsPage() {
     }
   };
 
- const supabaseLoomRecordsScript = `
+  const supabaseLoomRecordsScript = `
+-- Create loom_records table
+CREATE TABLE loom_records (
+  id UUID PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) NOT NULL DEFAULT auth.uid(),
+  date DATE NOT NULL,
+  time TIME NOT NULL,
+  shift TEXT NOT NULL,
+  machine_no TEXT NOT NULL,
+  stops INT NOT NULL,
+  weft_meter FLOAT NOT NULL,
+  total TEXT NOT NULL,
+  run TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- Enable Row Level Security
 ALTER TABLE loom_records ENABLE ROW LEVEL SECURITY;
 
@@ -197,11 +212,11 @@ CREATE TRIGGER on_auth_user_created
                 <h4 className='font-medium text-sm mb-2'>Supabase Setup Scripts</h4>
                 <p className='text-sm text-muted-foreground mb-4'>Run these scripts in your Supabase SQL editor to set up the necessary tables and policies for data storage and real-time sync.</p>
                 <FormLabel>1. Records Table & Policies</FormLabel>
-                <Textarea readOnly value={supabaseLoomRecordsScript} className="font-mono text-xs mt-2" rows={18} />
+                <Textarea readOnly value={supabaseLoomRecordsScript} className="font-mono text-xs mt-2" rows={24} />
               </div>
                <div>
                 <FormLabel>2. Settings Table & New User Trigger</FormLabel>
-                <Textarea readOnly value={supabaseSettingsScript} className="font-mono text-xs mt-2" rows={22} />
+                <Textarea readOnly value={supabaseSettingsScript} className="font-mono text-xs mt-2" rows={25} />
               </div>
             </CardContent>
           </Card>
