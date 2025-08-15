@@ -134,15 +134,26 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         try {
             const { data: initialRecords, error: recordsError } = await supabaseClient.from('loom_records').select('*');
             if (recordsError) throw recordsError;
-            setRecords(initialRecords || []);
-            saveToLocalStorage(LOCAL_RECORDS_STORAGE_KEY, initialRecords || []);
+            
+            // Merge local and remote records, giving precedence to remote if conflict by id
+            const localRecords = getFromLocalStorage<LoomRecord[]>(LOCAL_RECORDS_STORAGE_KEY, []);
+            const remoteRecordsMap = new Map((initialRecords || []).map(r => [r.id, r]));
+            const mergedRecords = localRecords.filter(lr => !remoteRecordsMap.has(lr.id)).concat(initialRecords || []);
+            
+            setRecords(mergedRecords);
+            saveToLocalStorage(LOCAL_RECORDS_STORAGE_KEY, mergedRecords);
 
             const { data: initialSettings, error: settingsError } = await supabaseClient.from('settings').select('*').limit(1).single();
-            if (settingsError) throw settingsError;
+            
+            if (settingsError && settingsError.code !== 'PGRST116') { // PGRST116: "object not found"
+                throw settingsError;
+            }
+            
             if(initialSettings) {
                 setSettings(initialSettings);
                 saveToLocalStorage(LOCAL_SETTINGS_STORAGE_KEY, initialSettings);
             }
+
             setSupabaseStatus('connected');
             toast({ title: "Connected to Supabase", description: "Data is live." });
             await processPending();
@@ -228,14 +239,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
 
   const addRecord = useCallback((record: Omit<LoomRecord, 'id'>) => {
-    const newRecord = { ...record, id: new Date().toISOString() };
+    const newRecord = { ...record, id: crypto.randomUUID() };
     setRecords(prev => {
         const updated = [...prev, newRecord];
         saveToLocalStorage(LOCAL_RECORDS_STORAGE_KEY, updated);
         return updated;
     });
     syncOrQueue({ type: 'add', record: newRecord });
-  }, [supabaseStatus, supabaseClient]);
+  }, []);
 
   const updateRecord = useCallback((updatedRecord: LoomRecord) => {
     setRecords(prev => {
@@ -244,7 +255,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         return updated;
     });
     syncOrQueue({ type: 'update', record: updatedRecord });
-  }, [supabaseStatus, supabaseClient]);
+  }, []);
 
   const deleteRecord = useCallback((id: string) => {
     setRecords(prev => {
@@ -253,7 +264,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         return updated;
     });
     syncOrQueue({ type: 'delete', id });
-  }, [supabaseStatus, supabaseClient]);
+  }, []);
 
   const updateSettings = useCallback(async (newSettings: Partial<AppSettings>) => {
     const updatedSettings = { ...settings, ...newSettings };
@@ -262,7 +273,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     
     if (supabaseStatus === 'connected' && supabaseClient) {
         try {
-            const { error } = await supabaseClient.from('settings').update(newSettings).eq('user_id', '1'); // Assuming single user settings
+            // Use upsert to create if not exists, or update if it does.
+            const { error } = await supabaseClient.from('settings').upsert(updatedSettings);
             if(error) throw error;
             toast({ title: 'Settings saved to Supabase.' });
         } catch(e) {
@@ -276,8 +288,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const deleteAllData = useCallback(async () => {
     if (supabaseStatus === 'connected' && supabaseClient) {
         try {
-            const { error: recordsError } = await supabaseClient.from('loom_records').delete().neq('id', '0');
-            if (recordsError) throw recordsError;
+            const { data, error } = await supabaseClient.from('loom_records').select('id');
+            if (error) throw error;
+            const idsToDelete = data.map(r => r.id);
+            if(idsToDelete.length > 0) {
+              const { error: deleteError } = await supabaseClient.from('loom_records').delete().in('id', idsToDelete);
+              if (deleteError) throw deleteError;
+            }
         } catch (e) {
             toast({ title: 'Delete Failed', description: 'Could not delete records from Supabase.', variant: 'destructive' });
         }
