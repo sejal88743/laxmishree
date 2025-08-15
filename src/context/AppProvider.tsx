@@ -45,7 +45,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const recordsChannel = useRef<RealtimeChannel | null>(null);
   const settingsChannel = useRef<RealtimeChannel | null>(null);
   
-  // Load initial data from localStorage
+  // Load initial data from localStorage on mount
   useEffect(() => {
     setRecords(getFromLocalStorage<LoomRecord[]>(LOCAL_RECORDS_STORAGE_KEY, []));
     const localSettings = getFromLocalStorage<AppSettings>(LOCAL_SETTINGS_STORAGE_KEY, DEFAULT_SETTINGS)
@@ -54,49 +54,39 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setIsInitialized(true);
   }, []);
 
-  // Persist pending sync operations to localStorage
+  // Persist pending sync operations to localStorage whenever they change
   useEffect(() => {
     if (isInitialized) {
       saveToLocalStorage(PENDING_SYNC_STORAGE_KEY, pendingSync);
     }
   }, [pendingSync, isInitialized]);
 
-  // Function to initialize Supabase client
-  const initializeSupabase = useCallback((url: string, key: string) => {
-    if (!url || !key) {
-        if (supabaseClient) {
-            supabaseClient.removeAllChannels();
+  // Initialize or tear down Supabase client when settings change
+  useEffect(() => {
+    if (isInitialized && settings.supabaseUrl && settings.supabaseKey) {
+        const client = createClient(settings.supabaseUrl, settings.supabaseKey);
+        setSupabaseClient(client);
+        setSupabaseStatus('reconnecting');
+
+        return () => {
+            client.removeAllChannels();
             setSupabaseClient(null);
             setSupabaseStatus('disconnected');
         }
-        return;
+    } else {
+        if(supabaseClient) {
+            supabaseClient.removeAllChannels();
+        }
+        setSupabaseClient(null);
+        setSupabaseStatus('disconnected');
     }
-    if (supabaseClient && supabaseClient.supabaseUrl === url) return;
-
-    setSupabaseStatus('reconnecting');
-    const client = createClient(url, key);
-    setSupabaseClient(client);
-  }, [supabaseClient]);
-  
-  // Initialize or re-initialize Supabase when settings change
-  useEffect(() => {
-      if(isInitialized && settings.supabaseUrl && settings.supabaseKey) {
-          initializeSupabase(settings.supabaseUrl, settings.supabaseKey);
-      }
-  }, [settings.supabaseUrl, settings.supabaseKey, isInitialized, initializeSupabase]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.supabaseUrl, settings.supabaseKey, isInitialized]);
 
 
-  // Effect for handling real-time sync and subscriptions
+  // Effect for handling data synchronization and real-time subscriptions
   useEffect(() => {
     if (!supabaseClient) {
-        if (recordsChannel.current) {
-            recordsChannel.current.unsubscribe();
-            recordsChannel.current = null;
-        }
-        if(settingsChannel.current) {
-            settingsChannel.current.unsubscribe();
-            settingsChannel.current = null;
-        }
       return;
     }
     
@@ -131,14 +121,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
-    // Process pending changes ONLY after initial sync is complete
-    useEffect(() => {
-        if(initialSyncComplete && supabaseStatus === 'connected') {
-            processPending();
-        }
-    }, [initialSyncComplete, supabaseStatus]);
-
-
     const setupSubscriptions = async () => {
         setInitialSyncComplete(false);
         setSupabaseStatus('reconnecting');
@@ -170,7 +152,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             }
 
             setSupabaseStatus('connected');
-            setInitialSyncComplete(true);
+            setInitialSyncComplete(true); // This will trigger the processPending effect
             toast({ title: "Connected to Supabase", description: "Data is live." });
             
         } catch (error) {
@@ -228,11 +210,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     };
 
     setupSubscriptions();
+    
+    // Process pending changes ONLY after initial sync is complete and connection is stable
+    if(initialSyncComplete && supabaseStatus === 'connected') {
+        processPending();
+    }
 
     return () => {
       if (recordsChannel.current) supabaseClient.removeChannel(recordsChannel.current);
       if (settingsChannel.current) supabaseClient.removeChannel(settingsChannel.current);
+      setInitialSyncComplete(false);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabaseClient]);
 
 
@@ -267,7 +256,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         return updated;
     });
     syncOrQueue({ type: 'add', record: newRecord });
-  }, [initialSyncComplete, supabaseStatus]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSyncComplete, supabaseStatus, supabaseClient]);
 
   const updateRecord = useCallback((updatedRecord: LoomRecord) => {
     setRecords(prev => {
@@ -276,7 +266,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         return updated;
     });
     syncOrQueue({ type: 'update', record: updatedRecord });
-  }, [initialSyncComplete, supabaseStatus]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSyncComplete, supabaseStatus, supabaseClient]);
 
   const deleteRecord = useCallback((id: string) => {
     setRecords(prev => {
@@ -285,7 +276,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         return updated;
     });
     syncOrQueue({ type: 'delete', id });
-  }, [initialSyncComplete, supabaseStatus]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSyncComplete, supabaseStatus, supabaseClient]);
 
   const updateSettings = useCallback(async (newSettings: Partial<AppSettings>) => {
     const updatedSettings = { ...settings, ...newSettings };
