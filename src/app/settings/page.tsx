@@ -59,7 +59,6 @@ export default function SettingsPage() {
 -- Create loom_records table if it doesn't exist
 CREATE TABLE IF NOT EXISTS public.loom_records (
   id UUID PRIMARY KEY,
-  user_id UUID REFERENCES auth.users(id) NOT NULL DEFAULT auth.uid(),
   date DATE NOT NULL,
   time TIME NOT NULL,
   shift TEXT NOT NULL,
@@ -74,27 +73,20 @@ CREATE TABLE IF NOT EXISTS public.loom_records (
 -- Enable Row Level Security
 ALTER TABLE public.loom_records ENABLE ROW LEVEL SECURITY;
 
--- Drop existing policies before creating new ones
-DROP POLICY IF EXISTS "user_select_own_records" ON public.loom_records;
-CREATE POLICY "user_select_own_records" ON public.loom_records FOR SELECT USING (auth.uid() = user_id);
-
-DROP POLICY IF EXISTS "user_insert_own_records" ON public.loom_records;
-CREATE POLICY "user_insert_own_records" ON public.loom_records FOR INSERT WITH CHECK (auth.uid() = user_id);
-
-DROP POLICY IF EXISTS "user_update_own_records" ON public.loom_records;
-CREATE POLICY "user_update_own_records" ON public.loom_records FOR UPDATE USING (auth.uid() = user_id);
-
-DROP POLICY IF EXISTS "user_delete_own_records" ON public.loom_records;
-CREATE POLICY "user_delete_own_records" ON public.loom_records FOR DELETE USING (auth.uid() = user_id);
+-- Allow public access to all records
+DROP POLICY IF EXISTS "public_access_policy" ON public.loom_records;
+CREATE POLICY "public_access_policy" ON public.loom_records FOR ALL USING (true) WITH CHECK (true);
 
 -- Add table to publication for realtime
+DROP PUBLICATION IF EXISTS supabase_realtime;
+CREATE PUBLICATION supabase_realtime;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.loom_records;
   `.trim();
 
   const supabaseSettingsScript = `
 -- Create settings table if it doesn't exist
 CREATE TABLE IF NOT EXISTS public.settings (
-  user_id UUID PRIMARY KEY DEFAULT auth.uid(),
+  id TEXT PRIMARY KEY DEFAULT 'global_settings',
   total_machines INT NOT NULL DEFAULT 10,
   low_efficiency_threshold INT NOT NULL DEFAULT 90,
   whatsapp_number TEXT DEFAULT '',
@@ -104,29 +96,26 @@ CREATE TABLE IF NOT EXISTS public.settings (
 -- Enable Row Level Security
 ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;
 
--- Drop existing policy before creating a new one
-DROP POLICY IF EXISTS "user_manage_own_settings" ON public.settings;
-CREATE POLICY "user_manage_own_settings" ON public.settings FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+-- Allow public access to settings
+DROP POLICY IF EXISTS "public_access_policy" ON public.settings;
+CREATE POLICY "public_access_policy" ON public.settings FOR ALL USING (true) WITH CHECK (true);
+
+-- Ensure there is only one row of settings
+-- This function will insert default settings if the table is empty.
+CREATE OR REPLACE FUNCTION public.ensure_single_settings_row()
+RETURNS void AS $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.settings WHERE id = 'global_settings') THEN
+    INSERT INTO public.settings (id) VALUES ('global_settings');
+  END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Call the function to initialize settings if needed.
+SELECT public.ensure_single_settings_row();
 
 -- Add table to publication for realtime
 ALTER PUBLICATION supabase_realtime ADD TABLE public.settings;
-
-
--- Function to insert default settings for a new user
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER AS $$
-BEGIN
-  INSERT INTO public.settings (user_id)
-  VALUES (new.id);
-  RETURN new;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Trigger to call the function on new user sign up
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-CREATE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
   `.trim();
 
 
@@ -205,10 +194,10 @@ CREATE TRIGGER on_auth_user_created
                 <h4 className='font-medium text-sm mb-2'>Supabase Setup Scripts</h4>
                 <p className='text-sm text-muted-foreground mb-4'>Run these scripts in your Supabase SQL editor to set up the necessary tables and policies for data storage and real-time sync.</p>
                 <FormLabel>1. Records Table & Policies</FormLabel>
-                <Textarea readOnly value={supabaseLoomRecordsScript} className="font-mono text-xs mt-2" rows={24} />
+                <Textarea readOnly value={supabaseLoomRecordsScript} className="font-mono text-xs mt-2" rows={20} />
               </div>
                <div>
-                <FormLabel>2. Settings Table & New User Trigger</FormLabel>
+                <FormLabel>2. Settings Table</FormLabel>
                 <Textarea readOnly value={supabaseSettingsScript} className="font-mono text-xs mt-2" rows={25} />
               </div>
             </CardContent>

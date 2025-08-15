@@ -8,7 +8,7 @@ export interface LoomRecord {
   weftMeter: number;
   total: string; // HH:MM:SS
   run: string; // HH:MM:SS
-  user_id?: string;
+  user_id?: string; // Kept for potential future use but not actively used for auth
 }
 
 export interface CalculatedLoomRecord extends LoomRecord {
@@ -18,7 +18,7 @@ export interface CalculatedLoomRecord extends LoomRecord {
 }
 
 export interface AppSettings {
-  user_id?: string;
+  id?: string; // 'global_settings'
   totalMachines: number;
   lowEfficiencyThreshold: number;
   geminiApiKey: string;
@@ -26,9 +26,11 @@ export interface AppSettings {
   messageTemplate: string;
   supabaseUrl: string;
   supabaseKey: string;
+  user_id?: string; // Kept for potential future use but not actively used for auth
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
+  id: 'global_settings',
   totalMachines: 10,
   lowEfficiencyThreshold: 90,
   geminiApiKey: '',
