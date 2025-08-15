@@ -62,18 +62,19 @@ export default function Dashboard() {
 
     const recentRecords = records.filter(r => new Date(r.date) >= threeDaysAgo);
     
-    const machineEfficiencies: { [key: string]: { totalRun: number, totalTime: number, recordCount: number } } = {};
+    const machineEfficiencies: { [key: string]: { totalRun: number, totalTime: number, recordCount: number, totalStops: number } } = {};
 
     recentRecords.forEach(r => {
       if (!machineEfficiencies[r.machineNo]) {
-        machineEfficiencies[r.machineNo] = { totalRun: 0, totalTime: 0, recordCount: 0 };
+        machineEfficiencies[r.machineNo] = { totalRun: 0, totalTime: 0, recordCount: 0, totalStops: 0 };
       }
       machineEfficiencies[r.machineNo].totalRun += timeToSeconds(r.run);
       machineEfficiencies[r.machineNo].totalTime += timeToSeconds(r.total);
+      machineEfficiencies[r.machineNo].totalStops += r.stops;
       machineEfficiencies[r.machineNo].recordCount++;
     });
     
-    const alerts: { machineNo: string; avgEfficiency: number, data: {date: string, efficiency: number}[] }[] = [];
+    const alerts: { machineNo: string; avgEfficiency: number, data: {date: string, efficiency: number, stops: number}[] }[] = [];
     Object.entries(machineEfficiencies).forEach(([machineNo, data]) => {
       if (data.recordCount === 0) return;
 
@@ -89,7 +90,12 @@ export default function Dashboard() {
         const efficiencyByDate = Object.entries(machineRecordsByDate).map(([date, dateRecords]) => {
           const totalRun = dateRecords.reduce((sum, r) => sum + timeToSeconds(r.run), 0);
           const totalTime = dateRecords.reduce((sum, r) => sum + timeToSeconds(r.total), 0);
-          return { date: new Date(date).toLocaleDateString('en-GB'), efficiency: calculateEfficiency(totalRun, totalTime) };
+          const totalStops = dateRecords.reduce((sum, r) => sum + r.stops, 0);
+          return { 
+            date: new Date(date).toLocaleDateString('en-GB', {day:'2-digit', month: '2-digit', year: 'numeric'}), 
+            efficiency: calculateEfficiency(totalRun, totalTime),
+            stops: totalStops
+          };
         }).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
         alerts.push({ machineNo, avgEfficiency, data: efficiencyByDate });
@@ -125,7 +131,7 @@ export default function Dashboard() {
     }
     const messageLines = lowEfficiencyAlerts.map(alert => 
       `Machine ${alert.machineNo}:\n` +
-      alert.data.map(d => `  - ${d.date}: ${d.efficiency.toFixed(2)}%`).join('\n')
+      alert.data.map(d => `  - Date: ${d.date}, Eff: ${d.efficiency.toFixed(2)}%, Stops: ${d.stops}`).join('\n')
     );
     const message = encodeURIComponent(`Low Efficiency Alert:\n\n${messageLines.join('\n\n')}`);
     window.open(`https://wa.me/${settings.whatsAppNumber}?text=${message}`);
