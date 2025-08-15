@@ -73,7 +73,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (supabaseClient && supabaseClient.supabaseUrl === url) return;
 
     setSupabaseStatus('reconnecting');
-    const client = createClient(url, key);
+    const client = createClient(url, key, {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true,
+      },
+    });
     setSupabaseClient(client);
   }, [supabaseClient]);
   
@@ -98,10 +104,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         }
       return;
     }
-
-    const processPending = async () => {
-        if (pendingSync.length === 0 || !initialSyncComplete) return;
-        toast({title: 'Syncing offline changes...'})
+    
+    const processPending = async (currentUserId?: string) => {
+        if (!currentUserId || pendingSync.length === 0) return;
+        
+        toast({title: `Syncing ${pendingSync.length} offline changes...`})
 
         const remainingOps: PendingSyncOperation[] = [];
         
@@ -109,7 +116,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             let success = false;
             try {
                 if (op.type === 'add' || op.type === 'update') {
-                    const { error } = await supabaseClient.from('loom_records').upsert(op.record);
+                    const recordWithUser = { ...op.record, user_id: currentUserId };
+                    const { error } = await supabaseClient.from('loom_records').upsert(recordWithUser);
                     if (error) throw error;
                 } else if (op.type === 'delete') {
                     const { error } = await supabaseClient.from('loom_records').delete().eq('id', op.id);
@@ -128,23 +136,22 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             toast({ title: 'Sync failed', description: `${remainingOps.length} changes could not be synced.`, variant: 'destructive'})
         }
     };
-    
-    // Process pending changes once the initial sync is done.
-    if(initialSyncComplete) {
-      processPending();
-    }
 
 
     const setupSubscriptions = async () => {
         setInitialSyncComplete(false);
         setSupabaseStatus('reconnecting');
-
-        // Fetch initial data
+        
         try {
+            // Fetch current user
+            const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession();
+            if (sessionError) throw sessionError;
+            const currentUser = session?.user;
+
+            // Fetch initial data
             const { data: initialRecords, error: recordsError } = await supabaseClient.from('loom_records').select('*');
             if (recordsError) throw recordsError;
             
-            // Merge local and remote records, giving precedence to remote if conflict by id
             const localRecords = getFromLocalStorage<LoomRecord[]>(LOCAL_RECORDS_STORAGE_KEY, []);
             const remoteRecordsMap = new Map((initialRecords || []).map(r => [r.id, r]));
             const mergedRecords = localRecords.filter(lr => !remoteRecordsMap.has(lr.id)).concat(initialRecords || []);
@@ -154,27 +161,32 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
             const { data: initialSettings, error: settingsError } = await supabaseClient.from('settings').select('*').limit(1).single();
             
-            if (settingsError && settingsError.code !== 'PGRST116') { // PGRST116: "object not found"
+            if (settingsError && settingsError.code !== 'PGRST116') { // PGRST116: "object not found" -> ok
                 throw settingsError;
             }
             
             if(initialSettings) {
                 setSettings(prevSettings => {
-                  const newSettings = { ...prevSettings, ...initialSettings};
+                  const newSettings = { ...prevSettings, ...initialSettings, user_id: currentUser?.id };
                   saveToLocalStorage(LOCAL_SETTINGS_STORAGE_KEY, newSettings);
                   return newSettings;
                 });
+            } else {
+                 setSettings(prevSettings => ({...prevSettings, user_id: currentUser?.id}));
             }
 
             setSupabaseStatus('connected');
-            setInitialSyncComplete(true); // Signal that initial data load is complete
+            setInitialSyncComplete(true);
             toast({ title: "Connected to Supabase", description: "Data is live." });
+            
+            // Process pending after initial sync is successful
+            await processPending(currentUser?.id);
 
         } catch (error) {
             console.error('Initial fetch from Supabase failed:', error);
             setSupabaseStatus('disconnected');
             toast({ title: 'Connection Failed', description: 'Could not fetch data from Supabase.', variant: 'destructive' });
-            return; // Don't setup subscriptions if initial fetch fails
+            return;
         }
         
         // Settings subscription
@@ -237,7 +249,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       if (supabaseStatus === 'connected' && supabaseClient && initialSyncComplete) {
           try {
               if (op.type === 'add' || op.type === 'update') {
-                  const { error } = await supabaseClient.from('loom_records').upsert(op.record);
+                  const recordWithUser = { ...op.record, user_id: settings.user_id };
+                  const { error } = await supabaseClient.from('loom_records').upsert(recordWithUser);
                   if (error) throw error;
               } else if (op.type === 'delete') {
                   const { error } = await supabaseClient.from('loom_records').delete().eq('id', op.id);
@@ -274,7 +287,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         return updated;
     });
     syncOrQueue({ type: 'update', record: updatedRecord });
-  }, [supabaseStatus, initialSyncComplete]);
+  }, [supabaseStatus, initialSyncComplete, settings.user_id]);
 
   const deleteRecord = useCallback((id: string) => {
     setRecords(prev => {
@@ -292,14 +305,22 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     
     if (supabaseStatus === 'connected' && supabaseClient) {
         try {
-            // we dont want to save the key to the DB
             const { supabaseKey, geminiApiKey, ...settingsToSave } = updatedSettings;
+            if(!settingsToSave.user_id) {
+                 const { data: { user } } = await supabaseClient.auth.getUser();
+                 if(user) settingsToSave.user_id = user.id;
+            }
+
+            if (!settingsToSave.user_id) {
+              toast({ title: 'User Not Found', description: 'Could not save settings without a user.', variant: 'destructive' });
+              return;
+            }
             
-            // Use upsert to create if not exists, or update if it does.
             const { error } = await supabaseClient.from('settings').upsert(settingsToSave);
             if(error) throw error;
             toast({ title: 'Settings saved to Supabase.' });
         } catch(e) {
+             console.error("Failed to save settings to Supabase:", e);
              toast({ title: 'Cloud Save Failed', description: 'Settings saved locally, but failed to save to Supabase.', variant: 'destructive'});
         }
     } else {
@@ -342,3 +363,5 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };
+
+    
