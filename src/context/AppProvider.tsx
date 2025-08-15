@@ -10,7 +10,7 @@ import { toast } from '@/hooks/use-toast';
 
 const LOCAL_RECORDS_STORAGE_KEY = 'laxmi-shree-records-v2';
 const LOCAL_SETTINGS_STORAGE_KEY = 'laxmi-shree-settings-v2';
-const PENDING_SYNC_STORAGE_KEY = 'laxmi-shree-pending-sync';
+const PENDING_SYNC_STORAGE_KEY = 'laxmi-shree-pending-sync-v2';
 const GLOBAL_SETTINGS_ID = 'global_settings';
 
 type SupabaseStatus = 'disconnected' | 'connected' | 'reconnecting';
@@ -44,163 +44,186 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   
   const recordsChannel = useRef<RealtimeChannel | null>(null);
   const settingsChannel = useRef<RealtimeChannel | null>(null);
+  
   const isSyncing = useRef(false);
-  const initialSyncComplete = useRef(false);
+  const initialDataFetched = useRef(false);
 
   // 1. Load initial data from localStorage on mount
   useEffect(() => {
-    setRecords(getFromLocalStorage<LoomRecord[]>(LOCAL_RECORDS_STORAGE_KEY, []));
-    setSettings(getFromLocalStorage<AppSettings>(LOCAL_SETTINGS_STORAGE_KEY, DEFAULT_SETTINGS));
-    setPendingSync(getFromLocalStorage<PendingSyncOperation[]>(PENDING_SYNC_STORAGE_KEY, []));
+    const localRecords = getFromLocalStorage<LoomRecord[]>(LOCAL_RECORDS_STORAGE_KEY, []);
+    const localSettings = getFromLocalStorage<AppSettings>(LOCAL_SETTINGS_STORAGE_KEY, DEFAULT_SETTINGS);
+    const localPending = getFromLocalStorage<PendingSyncOperation[]>(PENDING_SYNC_STORAGE_KEY, []);
+    
+    setRecords(localRecords);
+    setSettings(localSettings);
+    setPendingSync(localPending);
     setIsInitialized(true);
   }, []);
-
-  // 2. Save pending sync operations to localStorage whenever they change
+  
+  // 2. Save records and pending sync to localStorage when they change
   useEffect(() => {
     if (isInitialized) {
+      saveToLocalStorage(LOCAL_RECORDS_STORAGE_KEY, records);
       saveToLocalStorage(PENDING_SYNC_STORAGE_KEY, pendingSync);
     }
-  }, [pendingSync, isInitialized]);
-  
+  }, [records, pendingSync, isInitialized]);
+
+  // 3. Process pending queue when connected
   const processPending = useCallback(async (client: SupabaseClient) => {
     if (isSyncing.current || pendingSync.length === 0) return;
-
     isSyncing.current = true;
+    
     let opsToProcess = [...pendingSync];
-    
-    setPendingSync([]); 
-    
-    let failedOps: PendingSyncOperation[] = [];
+    let remainingOps = [...pendingSync];
 
     for (const op of opsToProcess) {
       try {
         if (op.type === 'add' || op.type === 'update') {
-           const { error } = await client.from('loom_records').upsert({
-              ...op.record,
-              stops: parseInt(op.record.stops as any, 10),
-              weft_meter: parseFloat(op.record.weftMeter as any),
-           }, { onConflict: 'id' });
-           if (error) throw error;
+          const { error } = await client.from('loom_records').upsert({
+            ...op.record,
+            stops: parseInt(op.record.stops as any, 10),
+            weft_meter: parseFloat(op.record.weftMeter as any),
+          }, { onConflict: 'id' });
+          if (error) throw error;
         } else if (op.type === 'delete') {
-           const { error } = await client.from('loom_records').delete().eq('id', op.id);
-           if (error) throw error;
+          const { error } = await client.from('loom_records').delete().eq('id', op.id);
+          if (error) throw error;
         }
+        remainingOps = remainingOps.filter(r => r !== op);
       } catch (error) {
         console.error('Failed to sync pending operation:', op.type, (op as any).record?.id || op.id, error);
-        failedOps.push(op);
       }
     }
-
-    if (failedOps.length > 0) {
-      setPendingSync(prev => [...failedOps, ...prev]);
-      toast({ title: 'Sync Incomplete', description: `${failedOps.length} changes could not be synced. Will retry.`, variant: 'destructive' });
+    
+    setPendingSync(remainingOps);
+    isSyncing.current = false;
+    
+    if (remainingOps.length > 0 && opsToProcess.length !== remainingOps.length) {
+      toast({ title: 'Sync Incomplete', description: `${remainingOps.length} changes could not be synced. Will retry.`, variant: 'destructive' });
     }
     
-    isSyncing.current = false;
   }, [pendingSync]);
 
-  // Manage Supabase client and connection based on settings
+
+  // 4. Manage Supabase client and connection based on settings
   useEffect(() => {
     if (!isInitialized) return;
-
+    
     const { supabaseUrl, supabaseKey } = settings;
 
     if (supabaseUrl && supabaseKey) {
-      const client = createClient(supabaseUrl, supabaseKey);
-      setSupabaseClient(client);
-      setSupabaseStatus('reconnecting');
+        const client = createClient(supabaseUrl, supabaseKey);
+        setSupabaseClient(client);
 
-      const initialFetch = async () => {
+        const setupSubscriptions = async () => {
+          setSupabaseStatus('reconnecting');
+          
           try {
+            if (!initialDataFetched.current) {
+              // Fetch settings first
               const { data: initialSettings, error: settingsError } = await client
-                  .from('settings').select('*').eq('id', GLOBAL_SETTINGS_ID).limit(1).single();
+                .from('settings')
+                .select('*')
+                .eq('id', GLOBAL_SETTINGS_ID)
+                .single();
               
               if (settingsError && settingsError.code !== 'PGRST116') throw settingsError;
 
-              if (initialSettings) {
-                  // Important: Use a function to update state to avoid stale state issues
-                  setSettings(prev => {
-                    const newSettings = { ...prev, ...initialSettings };
-                    saveToLocalStorage(LOCAL_SETTINGS_STORAGE_KEY, newSettings);
-                    return newSettings;
-                  });
-              }
+              const mergedSettings = { ...DEFAULT_SETTINGS, ...settings, ...initialSettings };
+              setSettings(mergedSettings);
+              saveToLocalStorage(LOCAL_SETTINGS_STORAGE_KEY, mergedSettings);
 
+              // Fetch records
               const { data: initialRecords, error: recordsError } = await client.from('loom_records').select('*');
               if (recordsError) throw recordsError;
-              
+
+              // Merge local and remote records
               setRecords(prevLocalRecords => {
-                  const remoteRecordsMap = new Map((initialRecords || []).map(r => [r.id, r]));
-                  const localRecordsMap = new Map(prevLocalRecords.map(r => [r.id, r]));
-                  const mergedRecords = Array.from(new Map([...localRecordsMap, ...remoteRecordsMap]).values());
-                  saveToLocalStorage(LOCAL_RECORDS_STORAGE_KEY, mergedRecords);
-                  return mergedRecords;
+                const remoteRecordsMap = new Map((initialRecords || []).map(r => [r.id, r]));
+                const localRecordsMap = new Map(prevLocalRecords.map(r => [r.id, r]));
+                const merged = Array.from(new Map([...localRecordsMap, ...remoteRecordsMap]).values());
+                saveToLocalStorage(LOCAL_RECORDS_STORAGE_KEY, merged);
+                return merged;
               });
-              
-              setSupabaseStatus('connected');
-              toast({ title: "Cloud Connected", description: "Data is live and syncing." });
-              initialSyncComplete.current = true;
-              processPending(client);
-          } catch (error) {
-              console.error('Initial fetch from Supabase failed:', error);
-              setSupabaseStatus('disconnected');
-              toast({ title: 'Connection Failed', description: 'Could not fetch data from Supabase.', variant: 'destructive' });
-              initialSyncComplete.current = false;
-          }
-      };
 
-      initialFetch();
+              initialDataFetched.current = true;
+            }
 
-      settingsChannel.current = client.channel('settings-channel')
-          .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'settings', filter: `id=eq.${GLOBAL_SETTINGS_ID}` }, (payload) => {
-              setSettings(prev => ({...prev, ...payload.new as AppSettings}));
-          }).subscribe();
-        
-      recordsChannel.current = client.channel('loom-records-channel')
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'loom_records' }, (payload) => {
-              setRecords(currentRecords => {
+            // After initial fetch, process any pending offline changes
+            await processPending(client);
+            
+            setSupabaseStatus('connected');
+            toast({ title: "Cloud Connected", description: "Data is live and syncing." });
+            
+            // Subscribe to channels
+            settingsChannel.current = client.channel('settings-channel')
+              .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'settings', filter: `id=eq.${GLOBAL_SETTINGS_ID}` }, (payload) => {
+                const newSettings = payload.new as AppSettings;
+                setSettings(prev => {
+                  const updated = { ...prev, ...newSettings };
+                  saveToLocalStorage(LOCAL_SETTINGS_STORAGE_KEY, updated);
+                  return updated;
+                });
+              }).subscribe();
+            
+            recordsChannel.current = client.channel('loom-records-channel')
+              .on('postgres_changes', { event: '*', schema: 'public', table: 'loom_records' }, (payload) => {
+                if (isSyncing.current) return;
+                
+                setRecords(currentRecords => {
                   let newRecords = [...currentRecords];
                   if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-                      const newRecord = payload.new as LoomRecord;
-                      const existingIndex = newRecords.findIndex(r => r.id === newRecord.id);
-                      if (existingIndex > -1) {
-                        newRecords[existingIndex] = newRecord;
-                      } else {
-                        newRecords.push(newRecord);
-                      }
+                    const newRecord = payload.new as LoomRecord;
+                    const existingIndex = newRecords.findIndex(r => r.id === newRecord.id);
+                    if (existingIndex > -1) {
+                      newRecords[existingIndex] = newRecord;
+                    } else {
+                      newRecords.push(newRecord);
+                    }
                   } else if (payload.eventType === 'DELETE') {
-                      const oldId = payload.old.id;
-                      newRecords = newRecords.filter(r => r.id !== oldId);
+                    const oldId = payload.old.id;
+                    newRecords = newRecords.filter(r => r.id !== oldId);
                   }
-                  saveToLocalStorage(LOCAL_RECORDS_STORAGE_KEY, newRecords);
-                  return newRecords;
-              });
-          }).subscribe();
+                  return newRecords; // The useEffect for saving will handle localStorage
+                });
+              }).subscribe();
 
-      return () => {
-        client.removeAllChannels();
+          } catch (error) {
+              console.error('Supabase connection or initial fetch failed:', error);
+              setSupabaseStatus('disconnected');
+              toast({ title: 'Connection Failed', description: 'Could not connect to Supabase.', variant: 'destructive' });
+          }
+        };
+
+        setupSubscriptions();
+
+        return () => {
+          client.removeAllChannels();
+          recordsChannel.current = null;
+          settingsChannel.current = null;
+          setSupabaseClient(null);
+          setSupabaseStatus('disconnected');
+          initialDataFetched.current = false; // Reset for next connection attempt
+        };
+    } else {
         setSupabaseClient(null);
         setSupabaseStatus('disconnected');
-        initialSyncComplete.current = false;
-      };
-    } else {
-      setSupabaseClient(null);
-      setSupabaseStatus('disconnected');
     }
   }, [isInitialized, settings.supabaseUrl, settings.supabaseKey, processPending]);
-
-
+  
+  // Effect to process pending queue whenever connection is established
   useEffect(() => {
-    if(supabaseStatus === 'connected' && supabaseClient && initialSyncComplete.current) {
-        processPending(supabaseClient);
+    if (supabaseStatus === 'connected' && supabaseClient) {
+      processPending(supabaseClient);
     }
-  }, [pendingSync, supabaseStatus, supabaseClient, processPending]);
+  }, [supabaseStatus, supabaseClient, processPending]);
 
 
   const syncOrQueue = useCallback((op: PendingSyncOperation) => {
     setPendingSync(prev => {
         let newPending = [...prev];
-        if(op.type !== 'add') {
+        // For updates and deletes, remove any previous operations for the same record
+        if (op.type !== 'add') {
             const idToFind = op.type === 'delete' ? op.id : op.record.id;
             newPending = newPending.filter(p => {
                 const p_id = p.type === 'delete' ? p.id : p.record.id;
@@ -213,32 +236,20 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const addRecord = useCallback((record: Omit<LoomRecord, 'id'>) => {
     const newRecord: LoomRecord = { ...record, id: crypto.randomUUID() };
-    setRecords(prev => {
-        const updated = [...prev, newRecord];
-        saveToLocalStorage(LOCAL_RECORDS_STORAGE_KEY, updated);
-        return updated;
-    });
+    setRecords(prev => [...prev, newRecord]);
     syncOrQueue({ type: 'add', record: newRecord });
   }, [syncOrQueue]);
 
   const updateRecord = useCallback((updatedRecord: LoomRecord) => {
-    setRecords(prev => {
-        const updated = prev.map(r => r.id === updatedRecord.id ? updatedRecord : r);
-        saveToLocalStorage(LOCAL_RECORDS_STORAGE_KEY, updated);
-        return updated;
-    });
+    setRecords(prev => prev.map(r => r.id === updatedRecord.id ? updatedRecord : r));
     syncOrQueue({ type: 'update', record: updatedRecord });
   }, [syncOrQueue]);
 
   const deleteRecord = useCallback((id: string) => {
-    setRecords(prev => {
-        const updated = prev.filter(r => r.id !== id);
-        saveToLocalStorage(LOCAL_RECORDS_STORAGE_KEY, updated);
-        return updated;
-    });
+    setRecords(prev => prev.filter(r => r.id !== id));
     syncOrQueue({ type: 'delete', id });
   }, [syncOrQueue]);
-
+  
   const updateSettings = useCallback(async (newSettings: Partial<AppSettings>) => {
     const updatedSettings = { ...settings, ...newSettings };
     setSettings(updatedSettings);
@@ -246,10 +257,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     
     if (supabaseClient && supabaseStatus === 'connected') {
         try {
-            const { supabaseKey, geminiApiKey, ...settingsToSave } = updatedSettings;
-            const settingsWithId = { ...settingsToSave, id: GLOBAL_SETTINGS_ID };
-            const { error } = await supabaseClient.from('settings').upsert(settingsWithId, { onConflict: 'id' });
-            if(error) throw error;
+            // Only save non-sensitive, non-client-specific settings to DB
+            const { supabaseUrl, supabaseKey, geminiApiKey, ...settingsToSave } = updatedSettings;
+            
+            const { error } = await supabaseClient
+                .from('settings')
+                .upsert({ ...settingsToSave, id: GLOBAL_SETTINGS_ID }, { onConflict: 'id' });
+
+            if (error) throw error;
             toast({ title: 'Settings saved to cloud.' });
         } catch(e) {
              console.error("Failed to save settings to Supabase:", e);
@@ -261,8 +276,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const deleteAllData = useCallback(async () => {
     setRecords([]);
     setPendingSync([]);
-    saveToLocalStorage(LOCAL_RECORDS_STORAGE_KEY, []);
-    saveToLocalStorage(PENDING_SYNC_STORAGE_KEY, []);
+    
     if (supabaseClient && supabaseStatus === 'connected') {
         try {
             const { error } = await supabaseClient.from('loom_records').delete().neq('id', '00000000-0000-0000-0000-000000000000');
