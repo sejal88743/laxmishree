@@ -120,7 +120,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             toast({ title: 'Sync failed', description: `${remainingOps.length} changes could not be synced.`, variant: 'destructive'})
         }
     };
-
+    
     const setupSubscriptions = async () => {
         setInitialSyncComplete(false);
         setSupabaseStatus('reconnecting');
@@ -152,8 +152,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             }
 
             setSupabaseStatus('connected');
-            setInitialSyncComplete(true); // This will trigger the processPending effect
             toast({ title: "Connected to Supabase", description: "Data is live." });
+            setInitialSyncComplete(true);
             
         } catch (error) {
             console.error('Initial fetch from Supabase failed:', error);
