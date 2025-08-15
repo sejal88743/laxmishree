@@ -1,10 +1,11 @@
+
 "use client";
 
 import React, { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { ArrowUp, ArrowDown, AlertTriangle, BarChart as BarChartIcon } from 'lucide-react';
+import { ArrowUp, ArrowDown, AlertTriangle, BarChart as BarChartIcon, LayoutDashboard } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useAppState } from '@/hooks/use-app-state';
 import { calculateEfficiency, timeToSeconds } from '@/lib/calculations';
@@ -13,7 +14,7 @@ import WhatsAppIcon from '@/components/WhatsAppIcon';
 
 export default function Dashboard() {
   const { records, settings } = useAppState();
-  const [showCharts, setShowCharts] = useState(false);
+  const [view, setView] = useState<'card' | 'chart'>('card');
 
   const today = new Date();
 
@@ -129,81 +130,89 @@ export default function Dashboard() {
   return (
     <div className="bg-background">
       <div className="p-2 space-y-4">
-        <section>
-          <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
-            {dailySummary.map(day => (
-              <Card key={day.date} className="text-center bg-card shadow-lg border-none">
-                <CardHeader className="p-2">
-                  <CardTitle className="text-xs font-medium text-muted-foreground">{day.date}</CardTitle>
-                </CardHeader>
-                <CardContent className="p-2">
-                  <p className="text-lg font-bold text-primary">{day.totalWeft.toLocaleString()}</p>
-                  <p className="text-xs text-muted-foreground">Weft</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </section>
+        <div className="flex gap-2">
+            <Button onClick={() => setView('card')} variant={view === 'card' ? 'secondary' : 'ghost'} className="w-full">
+                <LayoutDashboard className="mr-2 h-4 w-4" />
+                Card View
+            </Button>
+            <Button onClick={() => setView('chart')} variant={view === 'chart' ? 'secondary' : 'ghost'} className="w-full">
+                <BarChartIcon className="mr-2 h-4 w-4" />
+                Chart View
+            </Button>
+        </div>
 
-        {lowEfficiencyAlerts.length > 0 && (
-          <section>
-            <Alert variant="destructive" className="bg-red-100 border-red-400 text-red-800">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center">
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertTitle className="ml-2 font-bold">Low Efficiency Alert</AlertTitle>
+        {view === 'card' && (
+            <>
+                <section>
+                <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
+                    {dailySummary.map(day => (
+                    <Card key={day.date} className="text-center bg-card shadow-lg border-none">
+                        <CardHeader className="p-2">
+                        <CardTitle className="text-xs font-medium text-muted-foreground">{day.date}</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-2">
+                        <p className="text-lg font-bold text-primary">{day.totalWeft.toLocaleString()}</p>
+                        <p className="text-xs text-muted-foreground">Weft</p>
+                        </CardContent>
+                    </Card>
+                    ))}
                 </div>
-                <Button onClick={handleWhatsAppShare} size="sm" className="bg-green-500 hover:bg-green-600 text-white p-2 h-auto">
-                  <WhatsAppIcon className="h-4 w-4" />
-                </Button>
-              </div>
-              <AlertDescription className="mt-2 text-sm">
-                {lowEfficiencyAlerts.map(alert => (
-                  <div key={alert.machineNo} className="mb-1">
-                    Machine <strong>{alert.machineNo}</strong> is at <strong>{alert.avgEfficiency.toFixed(2)}%</strong> avg. efficiency.
-                  </div>
-                ))}
-              </AlertDescription>
-            </Alert>
-          </section>
-        )}
+                </section>
 
-        <section>
-          <h2 className="text-lg font-semibold text-primary mb-2">Today's Performance</h2>
-          <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
-            {Object.entries(performanceData).map(([machineNo, data]) => {
-              const trend = data.todayEfficiency - data.yesterdayEfficiency;
-              const cardColor = data.todayEfficiency > 90 ? 'bg-green-100 border-green-300' : data.todayEfficiency > 80 ? 'bg-blue-100 border-blue-300' : 'bg-red-100 border-red-300';
-              const textColor = data.todayEfficiency > 90 ? 'text-green-800' : data.todayEfficiency > 80 ? 'text-blue-800' : 'text-red-800';
-
-              return (
-                <Card key={machineNo} className={`text-center shadow-md ${cardColor} ${textColor}`}>
-                  <CardHeader className="p-2">
-                    <CardTitle className="text-sm font-bold">M {machineNo}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-2">
-                    <p className="text-xl font-bold">{data.todayEfficiency.toFixed(1)}%</p>
-                    <div className={`flex items-center justify-center text-xs ${trend >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {trend !== 0 && (trend > 0 ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
-                      {data.yesterdayEfficiency > 0 ? `${Math.abs(trend).toFixed(1)}%` : 'New'}
+                {lowEfficiencyAlerts.length > 0 && (
+                <section>
+                    <Alert variant="destructive" className="bg-red-100 border-red-400 text-red-800">
+                    <div className="flex justify-between items-center">
+                        <div className="flex items-center">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertTitle className="ml-2 font-bold">Low Efficiency Alert</AlertTitle>
+                        </div>
+                        <Button onClick={handleWhatsAppShare} size="sm" className="bg-green-500 hover:bg-green-600 text-white p-2 h-auto">
+                        <WhatsAppIcon className="h-4 w-4" />
+                        </Button>
                     </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        </section>
-        
-        <section>
-          <Button onClick={() => setShowCharts(!showCharts)} className="w-full mb-4">
-            <BarChartIcon className="mr-2 h-4 w-4" />
-            {showCharts ? 'Hide Charts' : 'Show Charts'}
-          </Button>
-        </section>
+                    <AlertDescription className="mt-2 text-sm">
+                        {lowEfficiencyAlerts.map(alert => (
+                        <div key={alert.machineNo} className="mb-1">
+                            Machine <strong>{alert.machineNo}</strong> is at <strong>{alert.avgEfficiency.toFixed(2)}%</strong> avg. efficiency.
+                        </div>
+                        ))}
+                    </AlertDescription>
+                    </Alert>
+                </section>
+                )}
+
+                <section>
+                <h2 className="text-lg font-semibold text-primary mb-2">Today's Performance</h2>
+                <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
+                    {Object.entries(performanceData).map(([machineNo, data]) => {
+                    const trend = data.todayEfficiency - data.yesterdayEfficiency;
+                    const cardColor = data.todayEfficiency > 90 ? 'bg-green-100 border-green-300' : data.todayEfficiency > 80 ? 'bg-blue-100 border-blue-300' : 'bg-red-100 border-red-300';
+                    const textColor = data.todayEfficiency > 90 ? 'text-green-800' : data.todayEfficiency > 80 ? 'text-blue-800' : 'text-red-800';
+
+                    return (
+                        <Card key={machineNo} className={`text-center shadow-md ${cardColor} ${textColor}`}>
+                        <CardHeader className="p-2">
+                            <CardTitle className="text-sm font-bold">M {machineNo}</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-2">
+                            <p className="text-xl font-bold">{data.todayEfficiency.toFixed(1)}%</p>
+                            <div className={`flex items-center justify-center text-xs ${trend >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {trend !== 0 && (trend > 0 ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
+                            {data.yesterdayEfficiency > 0 ? `${Math.abs(trend).toFixed(1)}%` : 'New'}
+                            </div>
+                        </CardContent>
+                        </Card>
+                    );
+                    })}
+                </div>
+                </section>
+            </>
+        )}
       </div>
 
-      {showCharts && (
-        <section className="space-y-4">
+      {view === 'chart' && (
+        <section className="space-y-4 p-2">
           <div>
             <Card className="shadow-lg">
               <CardHeader>
@@ -247,3 +256,5 @@ export default function Dashboard() {
     </div>
   );
 }
+
+  
