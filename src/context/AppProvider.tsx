@@ -38,6 +38,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [supabaseClient, setSupabaseClient] = useState<SupabaseClient | null>(null);
   const [supabaseStatus, setSupabaseStatus] = useState<SupabaseStatus>('disconnected');
   const [pendingSync, setPendingSync] = useState<PendingSyncOperation[]>([]);
+  const [initialSyncComplete, setInitialSyncComplete] = useState(false);
+
 
   const recordsChannel = useRef<RealtimeChannel | null>(null);
   const settingsChannel = useRef<RealtimeChannel | null>(null);
@@ -98,7 +100,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const processPending = async () => {
-        if (pendingSync.length === 0) return;
+        if (pendingSync.length === 0 || !initialSyncComplete) return;
         toast({title: 'Syncing offline changes...'})
 
         const remainingOps: PendingSyncOperation[] = [];
@@ -126,8 +128,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             toast({ title: 'Sync failed', description: `${remainingOps.length} changes could not be synced.`, variant: 'destructive'})
         }
     };
+    
+    // Process pending changes once the initial sync is done.
+    if(initialSyncComplete) {
+      processPending();
+    }
+
 
     const setupSubscriptions = async () => {
+        setInitialSyncComplete(false);
         setSupabaseStatus('reconnecting');
 
         // Fetch initial data
@@ -158,8 +167,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             }
 
             setSupabaseStatus('connected');
+            setInitialSyncComplete(true); // Signal that initial data load is complete
             toast({ title: "Connected to Supabase", description: "Data is live." });
-            await processPending();
 
         } catch (error) {
             console.error('Initial fetch from Supabase failed:', error);
@@ -225,7 +234,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
 
   const syncOrQueue = async (op: PendingSyncOperation) => {
-      if (supabaseStatus === 'connected' && supabaseClient) {
+      if (supabaseStatus === 'connected' && supabaseClient && initialSyncComplete) {
           try {
               if (op.type === 'add' || op.type === 'update') {
                   const { error } = await supabaseClient.from('loom_records').upsert(op.record);
@@ -256,7 +265,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         return updated;
     });
     syncOrQueue({ type: 'add', record: newRecord });
-  }, [settings.user_id]);
+  }, [settings.user_id, supabaseStatus, initialSyncComplete]);
 
   const updateRecord = useCallback((updatedRecord: LoomRecord) => {
     setRecords(prev => {
@@ -265,7 +274,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         return updated;
     });
     syncOrQueue({ type: 'update', record: updatedRecord });
-  }, []);
+  }, [supabaseStatus, initialSyncComplete]);
 
   const deleteRecord = useCallback((id: string) => {
     setRecords(prev => {
@@ -274,7 +283,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         return updated;
     });
     syncOrQueue({ type: 'delete', id });
-  }, []);
+  }, [supabaseStatus, initialSyncComplete]);
 
   const updateSettings = useCallback(async (newSettings: Partial<AppSettings>) => {
     const updatedSettings = { ...settings, ...newSettings };
@@ -283,7 +292,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     
     if (supabaseStatus === 'connected' && supabaseClient) {
         try {
-            const { user_id, ...settingsToSave } = updatedSettings;
+            // we dont want to save the key to the DB
+            const { supabaseKey, geminiApiKey, ...settingsToSave } = updatedSettings;
+            
             // Use upsert to create if not exists, or update if it does.
             const { error } = await supabaseClient.from('settings').upsert(settingsToSave);
             if(error) throw error;
