@@ -8,6 +8,7 @@ export interface LoomRecord {
   weftMeter: number;
   total: string; // HH:MM:SS
   run: string; // HH:MM:SS
+  user_id?: string;
 }
 
 export interface CalculatedLoomRecord extends LoomRecord {
@@ -17,6 +18,7 @@ export interface CalculatedLoomRecord extends LoomRecord {
 }
 
 export interface AppSettings {
+  user_id?: string;
   totalMachines: number;
   lowEfficiencyThreshold: number;
   geminiApiKey: string;

@@ -21,7 +21,7 @@ const settingsSchema = z.object({
   geminiApiKey: z.string().optional(),
   whatsAppNumber: z.string().optional(),
   messageTemplate: z.string().optional(),
-  supabaseUrl: z.string().url().optional().or(z.literal('')),
+  supabaseUrl: z.string().url({ message: "Please enter a valid Supabase URL." }).optional().or(z.literal('')),
   supabaseKey: z.string().optional(),
 });
 
@@ -48,39 +48,79 @@ export default function SettingsPage() {
   const handleDeleteAllData = () => {
     if (password === 'DELETE') {
         deleteAllData();
-        toast({ title: 'All data has been deleted.', variant: 'destructive' });
+        toast({ title: 'All local data has been deleted.', description: "Supabase data may need to be deleted manually.", variant: 'destructive' });
         setPassword('');
     } else {
         toast({ title: 'Incorrect password.', description: 'Please type "DELETE" to confirm.', variant: 'destructive' });
     }
   };
 
-  const supabaseLoomRecordsScript = `
-CREATE TABLE loom_records (
-  id TEXT PRIMARY KEY,
-  date DATE NOT NULL,
-  time TIME NOT NULL,
-  shift TEXT NOT NULL,
-  machine_no TEXT NOT NULL,
-  stops INTEGER NOT NULL,
-  weft_meter REAL NOT NULL,
-  total_time INTERVAL NOT NULL,
-  run_time INTERVAL NOT NULL,
-  user_id UUID DEFAULT auth.uid()
-);
+ const supabaseLoomRecordsScript = `
+-- Enable Row Level Security
+ALTER TABLE loom_records ENABLE ROW LEVEL SECURITY;
+
+-- Policy: Users can see their own records
+CREATE POLICY "user_select_own_records"
+ON loom_records FOR SELECT
+USING (auth.uid() = user_id);
+
+-- Policy: Users can insert their own records
+CREATE POLICY "user_insert_own_records"
+ON loom_records FOR INSERT
+WITH CHECK (auth.uid() = user_id);
+
+-- Policy: Users can update their own records
+CREATE POLICY "user_update_own_records"
+ON loom_records FOR UPDATE
+USING (auth.uid() = user_id);
+
+-- Policy: Users can delete their own records
+CREATE POLICY "user_delete_own_records"
+ON loom_records FOR DELETE
+USING (auth.uid() = user_id);
+
+-- Enable Realtime on the table
+ALTER PUBLICATION supabase_realtime ADD TABLE loom_records;
   `.trim();
 
   const supabaseSettingsScript = `
+-- Create settings table
 CREATE TABLE settings (
-  id INT PRIMARY KEY DEFAULT 1,
-  user_id UUID DEFAULT auth.uid(),
+  user_id UUID PRIMARY KEY DEFAULT auth.uid(),
   total_machines INT NOT NULL,
   low_efficiency_threshold INT NOT NULL,
   whatsapp_number TEXT,
-  message_template TEXT,
-  CONSTRAINT single_row CHECK (id = 1)
+  message_template TEXT
 );
+
+-- Enable Row Level Security
+ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
+
+-- Policy: Users can manage their own settings
+CREATE POLICY "user_manage_own_settings"
+ON settings FOR ALL
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
+
+-- Enable Realtime on the table
+ALTER PUBLICATION supabase_realtime ADD TABLE settings;
+
+-- Function to insert default settings for new user
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.settings (user_id, total_machines, low_efficiency_threshold, whatsapp_number, message_template)
+  VALUES (new.id, 10, 90, '', 'Record Details:\nDate: {{date}}\nTime: {{time}}\nShift: {{shift}}\nMachine: {{machineNo}}\nEfficiency: {{efficiency}}%');
+  RETURN new;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Trigger to call the function on new user sign up
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
   `.trim();
+
 
   return (
     <div className="p-2">
@@ -105,19 +145,6 @@ CREATE TABLE settings (
               )} />
             </CardContent>
           </Card>
-
-          <Card>
-            <CardHeader><CardTitle className="text-primary">API Settings</CardTitle><CardDescription>This API key will be stored as an environment variable for security.</CardDescription></CardHeader>
-            <CardContent className="space-y-4">
-              <FormField control={form.control} name="geminiApiKey" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Gemini API Key</FormLabel>
-                  <FormControl><Input type="password" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-            </CardContent>
-          </Card>
           
           <Card>
             <CardHeader><CardTitle className="text-primary">WhatsApp Settings</CardTitle></CardHeader>
@@ -125,14 +152,14 @@ CREATE TABLE settings (
               <FormField control={form.control} name="whatsAppNumber" render={({ field }) => (
                 <FormItem>
                   <FormLabel>WhatsApp Number (with country code)</FormLabel>
-                  <FormControl><Input placeholder="+911234567890" {...field} /></FormControl>
+                  <FormControl><Input placeholder="+911234567890" {...field} value={field.value ?? ''} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
               <FormField control={form.control} name="messageTemplate" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Message Template</FormLabel>
-                  <FormControl><Textarea placeholder="Use {{variable}} for dynamic content" {...field} /></FormControl>
+                  <FormControl><Textarea placeholder="Use {{variable}} for dynamic content" {...field} value={field.value ?? ''}/></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
@@ -141,31 +168,40 @@ CREATE TABLE settings (
           
           <Card>
             <CardHeader>
-              <CardTitle className="text-primary">Supabase Integration</CardTitle>
-              <CardDescription>Sync data to a Supabase backend. Run the SQL scripts below in your Supabase SQL editor.</CardDescription>
+              <CardTitle className="text-primary">Backend & Sync Settings</CardTitle>
+              <CardDescription>Enter your Supabase credentials to enable cloud sync. The Gemini key is used for AI features and should be set as a server secret in your hosting environment.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <FormField control={form.control} name="supabaseUrl" render={({ field }) => (
+               <FormField control={form.control} name="supabaseUrl" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Supabase URL</FormLabel>
-                  <FormControl><Input {...field} /></FormControl>
+                  <FormControl><Input {...field} value={field.value ?? ''} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
               <FormField control={form.control} name="supabaseKey" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Supabase API Key (public anon)</FormLabel>
-                  <FormControl><Input type="password" {...field} /></FormControl>
+                  <FormControl><Input type="password" {...field} value={field.value ?? ''} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
-               <div>
-                <FormLabel>Loom Records Table Script</FormLabel>
-                <Textarea readOnly value={supabaseLoomRecordsScript} className="font-mono text-xs mt-2" rows={11} />
+               <FormField control={form.control} name="geminiApiKey" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Gemini API Key (Server Secret)</FormLabel>
+                  <FormControl><Input type="password" {...field} value={field.value ?? ''} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <div>
+                <h4 className='font-medium text-sm mb-2'>Supabase Setup Scripts</h4>
+                <p className='text-sm text-muted-foreground mb-4'>Run these scripts in your Supabase SQL editor to set up the necessary tables and policies for data storage and real-time sync.</p>
+                <FormLabel>1. Records Table & Policies</FormLabel>
+                <Textarea readOnly value={supabaseLoomRecordsScript} className="font-mono text-xs mt-2" rows={18} />
               </div>
                <div>
-                <FormLabel>Settings Table Script</FormLabel>
-                <Textarea readOnly value={supabaseSettingsScript} className="font-mono text-xs mt-2" rows={10} />
+                <FormLabel>2. Settings Table & New User Trigger</FormLabel>
+                <Textarea readOnly value={supabaseSettingsScript} className="font-mono text-xs mt-2" rows={22} />
               </div>
             </CardContent>
           </Card>
@@ -182,17 +218,17 @@ CREATE TABLE settings (
           </CardHeader>
           <CardContent>
             <p className="text-sm mb-4">
-                This action is irreversible. It will delete all records and settings from this browser's local storage.
+                This action is irreversible. It will delete all records from this browser's local storage and attempt to delete them from Supabase if connected.
             </p>
             <AlertDialog>
                 <AlertDialogTrigger asChild>
-                    <Button variant="destructive"><Trash2 className="mr-2 h-4 w-4"/> Delete All Local Data</Button>
+                    <Button variant="destructive"><Trash2 className="mr-2 h-4 w-4"/> Delete All Data</Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            This will permanently delete all data from local storage. To confirm, type "DELETE" in the box below.
+                            This will permanently delete all data. To confirm, type "DELETE" in the box below.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <Input 
