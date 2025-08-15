@@ -278,7 +278,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         return updated;
     });
     syncOrQueue({ type: 'add', record: newRecord });
-  }, [settings.user_id, supabaseStatus, initialSyncComplete]);
+  }, [settings.user_id]);
 
   const updateRecord = useCallback((updatedRecord: LoomRecord) => {
     setRecords(prev => {
@@ -287,7 +287,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         return updated;
     });
     syncOrQueue({ type: 'update', record: updatedRecord });
-  }, [supabaseStatus, initialSyncComplete, settings.user_id]);
+  }, []);
 
   const deleteRecord = useCallback((id: string) => {
     setRecords(prev => {
@@ -296,7 +296,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         return updated;
     });
     syncOrQueue({ type: 'delete', id });
-  }, [supabaseStatus, initialSyncComplete]);
+  }, []);
 
   const updateSettings = useCallback(async (newSettings: Partial<AppSettings>) => {
     const updatedSettings = { ...settings, ...newSettings };
@@ -309,11 +309,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             if(!settingsToSave.user_id) {
                  const { data: { user } } = await supabaseClient.auth.getUser();
                  if(user) settingsToSave.user_id = user.id;
-            }
-
-            if (!settingsToSave.user_id) {
-              toast({ title: 'User Not Found', description: 'Could not save settings without a user.', variant: 'destructive' });
-              return;
             }
             
             const { error } = await supabaseClient.from('settings').upsert(settingsToSave);
@@ -363,5 +358,3 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };
-
-    
