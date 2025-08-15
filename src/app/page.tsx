@@ -1,19 +1,19 @@
 "use client";
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { ArrowUp, ArrowDown, AlertTriangle } from 'lucide-react';
+import { ArrowUp, ArrowDown, AlertTriangle, BarChart as BarChartIcon } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useAppState } from '@/hooks/use-app-state';
 import { calculateEfficiency, timeToSeconds } from '@/lib/calculations';
 import type { LoomRecord } from '@/lib/types';
 import WhatsAppIcon from '@/components/WhatsAppIcon';
-import Link from 'next/link';
 
 export default function Dashboard() {
   const { records, settings } = useAppState();
+  const [showCharts, setShowCharts] = useState(false);
 
   const today = new Date();
 
@@ -127,7 +127,7 @@ export default function Dashboard() {
 
 
   return (
-    <div className="p-0 m-0 bg-background">
+    <div className="bg-background">
       <div className="p-2 space-y-4">
         <section>
           <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
@@ -194,13 +194,24 @@ export default function Dashboard() {
           </div>
         </section>
         
+        <section>
+          <Button onClick={() => setShowCharts(!showCharts)} className="w-full mb-4">
+            <BarChartIcon className="mr-2 h-4 w-4" />
+            {showCharts ? 'Hide Charts' : 'Show Charts'}
+          </Button>
+        </section>
+      </div>
+
+      {showCharts && (
         <section className="space-y-4">
           <div>
-            <h2 className="text-lg font-semibold text-primary mb-2">Day Shift Performance (Last 30 Days)</h2>
             <Card className="shadow-lg">
-              <CardContent className="pt-6">
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold text-primary text-center">Day Shift Performance (Last 30 Days)</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
                 <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={chartData}>
+                  <BarChart data={chartData} margin={{ top: 5, right: 0, left: 0, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="name" fontSize={10} />
                     <YAxis fontSize={10} />
@@ -213,11 +224,13 @@ export default function Dashboard() {
             </Card>
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-primary mb-2">Night Shift Performance (Last 30 Days)</h2>
             <Card className="shadow-lg">
-              <CardContent className="pt-6">
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold text-primary text-center">Night Shift Performance (Last 30 Days)</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
                 <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={chartData}>
+                  <BarChart data={chartData} margin={{ top: 5, right: 0, left: 0, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="name" fontSize={10} />
                     <YAxis fontSize={10} />
@@ -230,7 +243,7 @@ export default function Dashboard() {
             </Card>
           </div>
         </section>
-      </div>
+      )}
     </div>
   );
 }
