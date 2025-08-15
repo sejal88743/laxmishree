@@ -40,12 +40,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [supabaseClient, setSupabaseClient] = useState<SupabaseClient | null>(null);
   const [supabaseStatus, setSupabaseStatus] = useState<SupabaseStatus>('disconnected');
   const [pendingSync, setPendingSync] = useState<PendingSyncOperation[]>([]);
-  const [initialSyncComplete, setInitialSyncComplete] = useState(false);
   
   const recordsChannel = useRef<RealtimeChannel | null>(null);
   const settingsChannel = useRef<RealtimeChannel | null>(null);
   const isSyncing = useRef(false);
 
+  // Load initial data from localStorage
   useEffect(() => {
     setRecords(getFromLocalStorage<LoomRecord[]>(LOCAL_RECORDS_STORAGE_KEY, []));
     setSettings(getFromLocalStorage<AppSettings>(LOCAL_SETTINGS_STORAGE_KEY, DEFAULT_SETTINGS));
@@ -53,12 +53,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setIsInitialized(true);
   }, []);
 
+  // Save pending sync operations to localStorage whenever they change
   useEffect(() => {
     if (isInitialized) {
       saveToLocalStorage(PENDING_SYNC_STORAGE_KEY, pendingSync);
     }
   }, [pendingSync, isInitialized]);
-
+  
+  // Initialize or tear down Supabase client when settings change
   useEffect(() => {
     if (!isInitialized) return;
 
@@ -66,11 +68,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (supabaseUrl && supabaseKey) {
         if (!supabaseClient || supabaseClient.supabaseUrl !== supabaseUrl) {
             const client = createClient(supabaseUrl, supabaseKey, {
-                realtime: {
-                    params: {
-                        eventsPerSecond: 2,
-                    }
-                }
+                realtime: { params: { eventsPerSecond: 5 } }
             });
             setSupabaseClient(client);
         }
@@ -78,9 +76,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         if(supabaseClient) {
             supabaseClient.removeAllChannels();
             setSupabaseClient(null);
+            setSupabaseStatus('disconnected');
         }
-        setSupabaseStatus('disconnected');
-        setInitialSyncComplete(false);
     }
     
     return () => {
@@ -88,31 +85,31 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             supabaseClient.removeAllChannels();
         }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.supabaseUrl, settings.supabaseKey, isInitialized]);
+
 
   const processPending = useCallback(async () => {
     if (!supabaseClient || isSyncing.current || pendingSync.length === 0) return;
 
     isSyncing.current = true;
-    toast({ title: `Syncing ${pendingSync.length} offline changes...` });
-
     const opsToProcess = [...pendingSync];
     let remainingOps = [...pendingSync];
-
+    
     for (const op of opsToProcess) {
       try {
         if (op.type === 'add' || op.type === 'update') {
-          const recordToUpsert = {
-            ...op.record,
-            stops: parseInt(op.record.stops as any, 10),
-            weftMeter: parseFloat(op.record.weftMeter as any),
-          };
-          const { error } = await supabaseClient.from('loom_records').upsert(recordToUpsert);
+          const { error } = await supabaseClient.from('loom_records').upsert({
+              ...op.record,
+              stops: parseInt(op.record.stops as any, 10),
+              weftMeter: parseFloat(op.record.weftMeter as any)
+          });
           if (error) throw error;
         } else if (op.type === 'delete') {
           const { error } = await supabaseClient.from('loom_records').delete().eq('id', op.id);
           if (error) throw error;
         }
+        // If successful, remove from remainingOps
         remainingOps = remainingOps.filter(r => r !== op);
       } catch (error) {
         console.error('Failed to sync pending operation:', op.type, (op as any).record?.id || op.id, error);
@@ -131,90 +128,88 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     isSyncing.current = false;
   }, [supabaseClient, pendingSync]);
 
+
+  // Setup subscriptions and initial data load
   useEffect(() => {
     if (!supabaseClient || !isInitialized) return;
+    
+    setSupabaseStatus('reconnecting');
 
-    const setupSubscriptions = async () => {
-      if (initialSyncComplete) return;
+    const initialFetch = async () => {
+        try {
+            // Fetch settings
+            const { data: initialSettings, error: settingsError } = await supabaseClient
+                .from('settings')
+                .select('*')
+                .eq('id', GLOBAL_SETTINGS_ID)
+                .limit(1)
+                .single();
+            if (settingsError && settingsError.code !== 'PGRST116') throw settingsError;
+            if (initialSettings) {
+                setSettings(prev => {
+                    const newSettings = { ...prev, ...initialSettings };
+                    saveToLocalStorage(LOCAL_SETTINGS_STORAGE_KEY, newSettings);
+                    return newSettings;
+                });
+            }
 
-      setSupabaseStatus('reconnecting');
-      try {
-        const { data: initialSettings, error: settingsError } = await supabaseClient.from('settings').select('*').eq('id', GLOBAL_SETTINGS_ID).limit(1).single();
-        if (settingsError && settingsError.code !== 'PGRST116') throw settingsError;
-        
-        if (initialSettings) {
-            setSettings(prev => {
-                const newSettings = { ...prev, ...initialSettings };
-                saveToLocalStorage(LOCAL_SETTINGS_STORAGE_KEY, newSettings);
-                return newSettings;
+            // Fetch records
+            const { data: initialRecords, error: recordsError } = await supabaseClient.from('loom_records').select('*');
+            if (recordsError) throw recordsError;
+            
+            setRecords(prevLocalRecords => {
+                const remoteRecordsMap = new Map((initialRecords || []).map(r => [r.id, r]));
+                const localRecordsMap = new Map(prevLocalRecords.map(r => [r.id, r]));
+                const mergedRecords = Array.from(new Map([...localRecordsMap, ...remoteRecordsMap]).values());
+                saveToLocalStorage(LOCAL_RECORDS_STORAGE_KEY, mergedRecords);
+                return mergedRecords;
             });
+            
+            setSupabaseStatus('connected');
+            toast({ title: "Connected to Supabase", description: "Data is live." });
+        } catch (error) {
+            console.error('Initial fetch from Supabase failed:', error);
+            setSupabaseStatus('disconnected');
+            toast({ title: 'Connection Failed', description: 'Could not fetch data from Supabase.', variant: 'destructive' });
         }
-        
-        const { data: initialRecords, error: recordsError } = await supabaseClient.from('loom_records').select('*');
-        if (recordsError) throw recordsError;
-        
-        setRecords(prevLocalRecords => {
-            const remoteRecordsMap = new Map((initialRecords || []).map(r => [r.id, r]));
-            const localRecordsMap = new Map(prevLocalRecords.map(r => [r.id, r]));
-            const mergedRecords = Array.from(new Map([...localRecordsMap, ...remoteRecordsMap]).values());
-            saveToLocalStorage(LOCAL_RECORDS_STORAGE_KEY, mergedRecords);
-            return mergedRecords;
-        });
-
-        setSupabaseStatus('connected');
-        toast({ title: "Connected to Supabase", description: "Data is live." });
-        setInitialSyncComplete(true);
-      } catch (error) {
-        console.error('Initial fetch from Supabase failed:', error);
-        setSupabaseStatus('disconnected');
-        toast({ title: 'Connection Failed', description: 'Could not fetch data from Supabase.', variant: 'destructive' });
-      }
     };
 
-    setupSubscriptions();
-  }, [supabaseClient, isInitialized, initialSyncComplete]);
+    initialFetch();
 
-  useEffect(() => {
-    if (initialSyncComplete && supabaseStatus === 'connected') {
-      processPending();
-    }
-  }, [initialSyncComplete, supabaseStatus, processPending]);
-  
-  useEffect(() => {
-    if (!supabaseClient || !isInitialized) return;
-
+    // Setup realtime channels
     if (settingsChannel.current) settingsChannel.current.unsubscribe();
     settingsChannel.current = supabaseClient.channel('settings-channel')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'settings', filter: `id=eq.${GLOBAL_SETTINGS_ID}` }, (payload) => {
-        setSettings(prev => ({...prev, ...payload.new as AppSettings}));
-      }).subscribe();
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'settings', filter: `id=eq.${GLOBAL_SETTINGS_ID}` }, (payload) => {
+            setSettings(prev => ({...prev, ...payload.new as AppSettings}));
+        }).subscribe();
       
     if (recordsChannel.current) recordsChannel.current.unsubscribe();
     recordsChannel.current = supabaseClient.channel('loom-records-channel')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'loom_records' }, (payload) => {
-        const isPending = pendingSync.some(p => (p.type !== 'delete' && p.record.id === (payload.new as LoomRecord)?.id) || (p.type === 'delete' && p.id === payload.old.id));
-        if (isSyncing.current && isPending) return;
-
-        setRecords(currentRecords => {
-          let newRecords = [...currentRecords];
-          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-            const newRecord = payload.new as LoomRecord;
-            const existingIndex = newRecords.findIndex(r => r.id === newRecord.id);
-            if (existingIndex > -1) newRecords[existingIndex] = newRecord;
-            else newRecords.push(newRecord);
-          } else if (payload.eventType === 'DELETE') {
-            newRecords = newRecords.filter(r => r.id !== payload.old.id);
-          }
-          saveToLocalStorage(LOCAL_RECORDS_STORAGE_KEY, newRecords);
-          return newRecords;
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'loom_records' }, (payload) => {
+            if (isSyncing.current) return;
+            setRecords(currentRecords => {
+                let newRecords = [...currentRecords];
+                if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+                    const newRecord = payload.new as LoomRecord;
+                    const existingIndex = newRecords.findIndex(r => r.id === newRecord.id);
+                    if (existingIndex > -1) newRecords[existingIndex] = newRecord;
+                    else newRecords.push(newRecord);
+                } else if (payload.eventType === 'DELETE') {
+                    const oldId = payload.old.id;
+                    if (oldId) {
+                      newRecords = newRecords.filter(r => r.id !== oldId);
+                    }
+                }
+                saveToLocalStorage(LOCAL_RECORDS_STORAGE_KEY, newRecords);
+                return newRecords;
+            });
+        }).subscribe((status) => {
+            if (status === 'SUBSCRIBED') {
+                if (supabaseStatus !== 'connected') setSupabaseStatus('connected');
+            } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                if (supabaseStatus !== 'disconnected') setSupabaseStatus('disconnected');
+            }
         });
-      }).subscribe((status) => {
-          if (status === 'SUBSCRIBED') {
-              if (supabaseStatus !== 'connected') setSupabaseStatus('connected');
-          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-              if (supabaseStatus !== 'disconnected') setSupabaseStatus('disconnected');
-          }
-      });
       
     return () => {
       if (supabaseClient) {
@@ -223,16 +218,29 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       recordsChannel.current = null;
       settingsChannel.current = null;
     };
-  }, [supabaseClient, isInitialized, pendingSync, supabaseStatus]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabaseClient, isInitialized]);
+
+
+  // Effect to process pending queue when connection is restored
+  useEffect(() => {
+      if(supabaseStatus === 'connected') {
+          processPending();
+      }
+  }, [supabaseStatus, processPending]);
 
 
   const syncOrQueue = useCallback((op: PendingSyncOperation) => {
     setPendingSync(prev => {
-        // For updates/deletes, remove any older pending operations for the same record
+        let newPending = [...prev];
         if(op.type !== 'add') {
-            return [...prev.filter(p => (p.type !== 'delete' && p.record.id !== op.id) || (p.type === 'delete' && p.id !== op.id)), op];
+            const idToFind = op.type === 'delete' ? op.id : op.record.id;
+            newPending = newPending.filter(p => {
+                const p_id = p.type === 'delete' ? p.id : p.record.id;
+                return p_id !== idToFind;
+            });
         }
-        return [...prev, op];
+        return [...newPending, op];
     });
   }, []);
 
@@ -315,3 +323,5 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };
+
+    
