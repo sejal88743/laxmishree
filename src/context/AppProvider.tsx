@@ -73,8 +73,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (isSyncing.current || pendingSync.length === 0) return;
     isSyncing.current = true;
     
-    let opsToProcess = [...pendingSync];
-    let remainingOps = [...pendingSync];
+    const opsToProcess = [...pendingSync];
+    let remainingOps: PendingSyncOperation[] = [];
 
     for (const op of opsToProcess) {
       try {
@@ -89,9 +89,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           const { error } = await client.from('loom_records').delete().eq('id', op.id);
           if (error) throw error;
         }
-        remainingOps = remainingOps.filter(r => r !== op);
       } catch (error) {
         console.error('Failed to sync pending operation:', op.type, (op as any).record?.id || op.id, error);
+        remainingOps.push(op);
       }
     }
     
@@ -257,12 +257,17 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     
     if (supabaseClient && supabaseStatus === 'connected') {
         try {
-            // Only save non-sensitive, non-client-specific settings to DB
-            const { supabaseUrl, supabaseKey, geminiApiKey, ...settingsToSave } = updatedSettings;
+            const settingsToSave = {
+                id: GLOBAL_SETTINGS_ID,
+                total_machines: updatedSettings.totalMachines,
+                low_efficiency_threshold: updatedSettings.lowEfficiencyThreshold,
+                whatsapp_number: updatedSettings.whatsAppNumber,
+                message_template: updatedSettings.messageTemplate,
+            };
             
             const { error } = await supabaseClient
                 .from('settings')
-                .upsert({ ...settingsToSave, id: GLOBAL_SETTINGS_ID }, { onConflict: 'id' });
+                .upsert(settingsToSave, { onConflict: 'id' });
 
             if (error) throw error;
             toast({ title: 'Settings saved to cloud.' });
