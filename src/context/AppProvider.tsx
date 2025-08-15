@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { createContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
@@ -66,10 +67,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     const { supabaseUrl, supabaseKey } = settings;
     if (supabaseUrl && supabaseKey) {
-      if (!supabaseClient) {
+      if (!supabaseClient || supabaseClient.supabaseUrl !== supabaseUrl) {
           const client = createClient(supabaseUrl, supabaseKey);
           setSupabaseClient(client);
-          setSupabaseStatus('reconnecting');
       }
     } else {
         if(supabaseClient) {
@@ -77,72 +77,72 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             setSupabaseClient(null);
         }
         setSupabaseStatus('disconnected');
+        setInitialSyncComplete(false);
     }
-  }, [settings.supabaseUrl, settings.supabaseKey, isInitialized, supabaseClient]);
+    
+    // Cleanup on unmount
+    return () => {
+        if (supabaseClient) {
+            supabaseClient.removeAllChannels();
+        }
+    }
+  }, [settings.supabaseUrl, settings.supabaseKey, isInitialized]);
 
 
   const processPending = useCallback(async () => {
     if (!supabaseClient || isSyncing.current || pendingSync.length === 0) return;
-  
+
     isSyncing.current = true;
     toast({ title: `Syncing ${pendingSync.length} offline changes...` });
-  
-    const remainingOps: PendingSyncOperation[] = [];
-    let opsToProcess = [...pendingSync];
-  
+
+    const opsToProcess = [...pendingSync];
+    let remainingOps = [...pendingSync];
+    let successfulOps = 0;
+
     for (const op of opsToProcess) {
       try {
         if (op.type === 'add' || op.type === 'update') {
-          // Ensure numeric types are correct
           const recordToUpsert = {
             ...op.record,
-            weftMeter: parseFloat(op.record.weftMeter as any),
             stops: parseInt(op.record.stops as any, 10),
+            weftMeter: parseFloat(op.record.weftMeter as any),
           };
           const { error } = await supabaseClient.from('loom_records').upsert(recordToUpsert);
           if (error) throw error;
+
         } else if (op.type === 'delete') {
           const { error } = await supabaseClient.from('loom_records').delete().eq('id', op.id);
           if (error) throw error;
         }
+
+        // If successful, remove from remainingOps
+        remainingOps = remainingOps.filter(r => r !== op);
+        successfulOps++;
+
       } catch (error) {
-        console.error('Failed to sync pending operation:', op, error);
-        remainingOps.push(op);
+        console.error('Failed to sync pending operation:', op.type, (op as any).record?.id || op.id, error);
       }
     }
-  
-    if (remainingOps.length < pendingSync.length) {
-      const successCount = pendingSync.length - remainingOps.length;
-      if (successCount > 0) {
-        toast({ title: 'Sync complete!', description: `${successCount} change(s) have been saved.` });
-      }
+    
+    if (successfulOps > 0) {
+      toast({ title: 'Sync complete!', description: `${successfulOps} change(s) have been saved.` });
     }
-  
-    if (remainingOps.length > 0) {
+
+    if (remainingOps.length > 0 && remainingOps.length < opsToProcess.length) {
       toast({ title: 'Sync partially failed', description: `${remainingOps.length} changes could not be synced. Will retry.`, variant: 'destructive' });
     }
-  
+    
     setPendingSync(remainingOps);
     isSyncing.current = false;
   }, [pendingSync, supabaseClient]);
 
-  // Process pending changes ONLY after initial sync is complete and connection is stable
+  // Combined effect for subscriptions and pending processing
   useEffect(() => {
-      if(initialSyncComplete && supabaseStatus === 'connected') {
-          processPending();
-      }
-  }, [initialSyncComplete, supabaseStatus, processPending]);
+    if (!supabaseClient || !isInitialized) return;
 
-
-  // 5. Setup subscriptions and initial data fetch
-  useEffect(() => {
-    if (!supabaseClient || !isInitialized) {
-      return;
-    }
-    
     let isSubscribed = true;
 
-    const setup = async () => {
+    const setupSubscriptions = async () => {
       if (initialSyncComplete) return;
 
       setSupabaseStatus('reconnecting');
@@ -150,7 +150,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         // Fetch initial settings
         const { data: initialSettings, error: settingsError } = await supabaseClient.from('settings').select('*').eq('id', GLOBAL_SETTINGS_ID).limit(1).single();
         if (settingsError && settingsError.code !== 'PGRST116') throw settingsError;
-        if(initialSettings && isSubscribed) {
+        
+        if (isSubscribed && initialSettings) {
             setSettings(prev => {
                 const newSettings = { ...prev, ...initialSettings };
                 saveToLocalStorage(LOCAL_SETTINGS_STORAGE_KEY, newSettings);
@@ -173,28 +174,27 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             toast({ title: "Connected to Supabase", description: "Data is live." });
             setInitialSyncComplete(true);
         }
-        
       } catch (error) {
         console.error('Initial fetch from Supabase failed:', error);
         if (isSubscribed) {
             setSupabaseStatus('disconnected');
             toast({ title: 'Connection Failed', description: 'Could not fetch data from Supabase.', variant: 'destructive' });
         }
-        return;
       }
     };
-    setup();
 
-    // Subscribe to channels
+    setupSubscriptions();
+
     if (settingsChannel.current) settingsChannel.current.unsubscribe();
     settingsChannel.current = supabaseClient.channel('settings-channel')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'settings', filter: `id=eq.${GLOBAL_SETTINGS_ID}` }, (payload) => {
-        setSettings(prev => ({...prev, ...payload.new as AppSettings}));
+        if(isSubscribed) setSettings(prev => ({...prev, ...payload.new as AppSettings}));
       }).subscribe();
       
     if (recordsChannel.current) recordsChannel.current.unsubscribe();
     recordsChannel.current = supabaseClient.channel('loom-records-channel')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'loom_records' }, (payload) => {
+        if (!isSubscribed) return;
         setRecords(currentRecords => {
           let newRecords = [...currentRecords];
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
@@ -209,6 +209,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           return newRecords;
         });
       }).subscribe((status, err) => {
+          if(!isSubscribed) return;
           if (status === 'SUBSCRIBED') {
               if (supabaseStatus !== 'connected') setSupabaseStatus('connected');
           } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
@@ -217,25 +218,28 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           if (err) {
             console.error('Realtime subscription error:', err);
             setSupabaseStatus('reconnecting');
-            setTimeout(() => setup(), 5000);
           }
       });
-
+      
     return () => {
       isSubscribed = false;
-      supabaseClient.removeAllChannels();
+      if (supabaseClient) {
+        supabaseClient.removeAllChannels();
+      }
       recordsChannel.current = null;
       settingsChannel.current = null;
     };
   }, [supabaseClient, isInitialized, initialSyncComplete]);
 
+  useEffect(() => {
+    if (initialSyncComplete && supabaseStatus === 'connected') {
+        processPending();
+    }
+  }, [initialSyncComplete, supabaseStatus, processPending]);
 
   const syncOrQueue = useCallback((op: PendingSyncOperation) => {
     setPendingSync(prev => [...prev, op]);
-    if (supabaseClient && supabaseStatus === 'connected') {
-      processPending();
-    }
-  }, [supabaseClient, supabaseStatus, processPending]);
+  }, []);
 
   const addRecord = useCallback((record: Omit<LoomRecord, 'id'>) => {
     const newRecord: LoomRecord = { ...record, id: crypto.randomUUID() };
