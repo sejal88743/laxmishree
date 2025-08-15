@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -15,6 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { toast } from '@/hooks/use-toast';
 import { Calendar as CalendarIcon, Upload, Camera, Save, Loader2, ArrowLeft } from 'lucide-react';
 import { format } from 'date-fns';
@@ -36,65 +37,112 @@ export default function AddEfficiencyRecordPage() {
   const router = useRouter();
   const { addRecord, settings } = useAppState();
   const [isScanning, setIsScanning] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
+  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      date: new Date(),
-      time: format(new Date(), 'HH:mm'),
-      shift: 'Day',
-      machineNo: '',
-      stops: 0,
-      weftMeter: 0,
-      total: '00:00:00',
-      run: '00:00:00',
-    },
-  });
+  useEffect(() => {
+    if (!showCamera) return;
+    const getCameraPermission = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        setHasCameraPermission(true);
 
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      } catch (error) {
+        console.error('Error accessing camera:', error);
+        setHasCameraPermission(false);
+        toast({
+          variant: 'destructive',
+          title: 'Camera Access Denied',
+          description: 'Please enable camera permissions in your browser settings to use this app.',
+        });
+        setShowCamera(false);
+      }
+    };
 
+    getCameraPermission();
+    
+    return () => {
+        if(videoRef.current && videoRef.current.srcObject) {
+            const stream = videoRef.current.srcObject as MediaStream;
+            stream.getTracks().forEach(track => track.stop());
+        }
+    }
+  }, [showCamera]);
+
+
+  const processScanResult = (result: Awaited<ReturnType<typeof scanLoomDisplay>>) => {
+    const valuesToSet: Partial<z.infer<typeof formSchema>> = {};
+    if (result.date) {
+        const [day, month, year] = result.date.split('/');
+        if(day && month && year) {
+            valuesToSet.date = new Date(`${year}-${month}-${day}`);
+        }
+    }
+    if (result.time) valuesToSet.time = result.time;
+    if (result.shift) {
+        if (result.shift.toUpperCase() === 'A') valuesToSet.shift = 'Day';
+        if (result.shift.toUpperCase() === 'B') valuesToSet.shift = 'Night';
+    }
+    if (result.machineNo) valuesToSet.machineNo = result.machineNo;
+    if (result.stops) valuesToSet.stops = parseInt(result.stops, 10);
+    if (result.weftMeter) valuesToSet.weftMeter = parseFloat(result.weftMeter);
+    if (result.total) valuesToSet.total = result.total;
+    if (result.run) valuesToSet.run = result.run;
+    
+    form.reset({ ...form.getValues(), ...valuesToSet });
+
+    toast({ title: 'Scan Complete', description: 'Form has been pre-filled.' });
+  }
+
+  const performScan = async (photoDataUri: string) => {
     setIsScanning(true);
     try {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        const photoDataUri = e.target?.result as string;
-        if (!photoDataUri) {
-          toast({ variant: 'destructive', title: 'Error', description: 'Could not read file.' });
-          return;
-        }
-
-        const result = await scanLoomDisplay({ photoDataUri });
-
-        const valuesToSet: Partial<z.infer<typeof formSchema>> = {};
-        if (result.date) {
-            const [day, month, year] = result.date.split('/');
-            if(day && month && year) {
-                valuesToSet.date = new Date(`${year}-${month}-${day}`);
-            }
-        }
-        if (result.time) valuesToSet.time = result.time;
-        if (result.shift && (result.shift === 'Day' || result.shift === 'Night')) valuesToSet.shift = result.shift;
-        if (result.machineNo) valuesToSet.machineNo = result.machineNo;
-        if (result.stops) valuesToSet.stops = parseInt(result.stops, 10);
-        if (result.weftMeter) valuesToSet.weftMeter = parseFloat(result.weftMeter);
-        if (result.total) valuesToSet.total = result.total;
-        if (result.run) valuesToSet.run = result.run;
-        
-        form.reset({ ...form.getValues(), ...valuesToSet });
-
-        toast({ title: 'Scan Complete', description: 'Form has been pre-filled.' });
-      };
-      reader.readAsDataURL(file);
+      const result = await scanLoomDisplay({ photoDataUri });
+      processScanResult(result);
     } catch (error) {
       console.error('Scan failed:', error);
       toast({ variant: 'destructive', title: 'Scan Failed', description: 'Could not extract data from the image.' });
     } finally {
       setIsScanning(false);
-      // Reset file input
-      if(event.target) event.target.value = '';
+    }
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const photoDataUri = e.target?.result as string;
+      if (!photoDataUri) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not read file.' });
+        return;
+      }
+      await performScan(photoDataUri);
+    };
+    reader.readAsDataURL(file);
+    // Reset file input
+    if(event.target) event.target.value = '';
+  };
+
+  const handleCapture = async () => {
+    if (videoRef.current && canvasRef.current) {
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const context = canvas.getContext('2d');
+        if(!context) return;
+        context.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+        const photoDataUri = canvas.toDataURL('image/jpeg');
+        setShowCamera(false);
+        await performScan(photoDataUri);
     }
   };
 
@@ -106,7 +154,6 @@ export default function AddEfficiencyRecordPage() {
     addRecord(record);
     toast({ title: 'Record Saved!', description: `Record for Machine ${values.machineNo} has been added.` });
     
-    // Reset form but keep date and machine number
     const keptValues = { date: values.date, machineNo: values.machineNo, shift: values.shift };
     form.reset({
         ...form.formState.defaultValues,
@@ -121,24 +168,64 @@ export default function AddEfficiencyRecordPage() {
 
   const machineOptions = Array.from({ length: settings.totalMachines || 0 }, (_, i) => (i + 1).toString());
 
+  if (showCamera) {
+    return (
+      <div className="p-2">
+        <Card className="m-0 shadow-lg">
+          <CardHeader>
+            <CardTitle className="text-primary">Scan Display</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+             <div className='relative'>
+                <video ref={videoRef} className="w-full aspect-video rounded-md bg-black" autoPlay muted playsInline />
+                <canvas ref={canvasRef} className="hidden" />
+                {isScanning && <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-md"><Loader2 className="h-10 w-10 animate-spin text-white" /></div>}
+             </div>
+
+            {hasCameraPermission === false && (
+                <Alert variant="destructive">
+                  <AlertTitle>Camera Access Required</AlertTitle>
+                  <AlertDescription>
+                    Please allow camera access to use this feature.
+                  </AlertDescription>
+                </Alert>
+            )}
+
+            <div className="flex gap-2">
+              <Button onClick={handleCapture} className="w-full" disabled={isScanning || !hasCameraPermission}>
+                <Camera className="mr-2 h-4 w-4" /> Capture
+              </Button>
+              <Button onClick={() => setShowCamera(false)} variant="outline" className="w-full">
+                Cancel
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+
   return (
     <div className="p-2">
       <Card className="m-0 shadow-lg">
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-primary">
+          <div className='flex items-center gap-2'>
             <Button variant="ghost" size="icon" onClick={() => router.back()}>
                 <ArrowLeft />
             </Button>
-            Add New Record
-          </CardTitle>
+            <CardTitle className="text-primary text-2xl">
+                Add New Record
+            </CardTitle>
+          </div>
           <div className="flex gap-2">
             <input type="file" accept="image/*" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
             <Button type="button" onClick={() => fileInputRef.current?.click()} disabled={isScanning}>
               {isScanning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
               Upload
             </Button>
-            <Button type="button" onClick={() => fileInputRef.current?.click()} disabled={isScanning}>
-              {isScanning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Camera className="mr-2 h-4 w-4" />}
+            <Button type="button" onClick={() => setShowCamera(true)} disabled={isScanning}>
+              <Camera className="mr-2 h-4 w-4" />
               Scan
             </Button>
           </div>
@@ -187,7 +274,7 @@ export default function AddEfficiencyRecordPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Shift</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl><SelectTrigger><SelectValue placeholder="Select shift" /></SelectTrigger></FormControl>
                         <SelectContent>
                           <SelectItem value="Day">Day</SelectItem>
@@ -204,7 +291,7 @@ export default function AddEfficiencyRecordPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Machine No.</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl><SelectTrigger><SelectValue placeholder="Select machine" /></SelectTrigger></FormControl>
                         <SelectContent>
                           {machineOptions.map(num => <SelectItem key={num} value={num}>{num}</SelectItem>)}
@@ -230,7 +317,7 @@ export default function AddEfficiencyRecordPage() {
                   name="weftMeter"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Weft Meter</FormLabel>
+                      <FormLabel>Cloth Length (Weft Meter)</FormLabel>
                       <FormControl><Input type="number" step="0.1" {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
