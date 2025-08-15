@@ -179,6 +179,8 @@ export default function AddEfficiencyRecordPage() {
   };
 
   const machineOptions = Array.from({ length: settings.totalMachines || 0 }, (_, i) => (i + 1).toString());
+  
+  const formLabelStyle = "font-bold text-[9px]";
 
   if (showCamera) {
     return (
@@ -226,9 +228,7 @@ export default function AddEfficiencyRecordPage() {
             <Button variant="ghost" size="icon" onClick={() => router.back()}>
                 <ArrowLeft />
             </Button>
-            <CardTitle className="text-primary text-2xl">
-                Add New Record
-            </CardTitle>
+            
           </div>
           <div className="flex gap-2">
             <input type="file" accept="image/*" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
@@ -245,18 +245,18 @@ export default function AddEfficiencyRecordPage() {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-2">
                 <FormField
                   control={form.control}
                   name="date"
                   render={({ field }) => (
                     <FormItem className="flex flex-col">
-                      <FormLabel>Date</FormLabel>
+                      <FormLabel className={formLabelStyle}>Date</FormLabel>
                       <Popover>
                         <PopoverTrigger asChild>
                           <FormControl>
-                            <Button variant="outline" className={cn('pl-3 text-left font-normal', !field.value && 'text-muted-foreground')}>
-                              {field.value ? format(field.value, 'PPP') : <span>Pick a date</span>}
+                            <Button variant="outline" className={cn('pl-3 text-left font-normal h-9', !field.value && 'text-muted-foreground')}>
+                              {field.value ? format(field.value, 'dd/MM/yy') : <span>Pick date</span>}
                               <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                             </Button>
                           </FormControl>
@@ -274,8 +274,8 @@ export default function AddEfficiencyRecordPage() {
                   name="time"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Time</FormLabel>
-                      <FormControl><Input type="time" {...field} /></FormControl>
+                      <FormLabel className={formLabelStyle}>Time</FormLabel>
+                      <FormControl><Input type="time" {...field} className="h-9" /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -285,9 +285,9 @@ export default function AddEfficiencyRecordPage() {
                   name="shift"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Shift</FormLabel>
+                      <FormLabel className={formLabelStyle}>Shift</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl><SelectTrigger><SelectValue placeholder="Select shift" /></SelectTrigger></FormControl>
+                        <FormControl><SelectTrigger className="h-9"><SelectValue placeholder="Shift" /></SelectTrigger></FormControl>
                         <SelectContent>
                           <SelectItem value="Day">Day</SelectItem>
                           <SelectItem value="Night">Night</SelectItem>
@@ -302,9 +302,9 @@ export default function AddEfficiencyRecordPage() {
                   name="machineNo"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Machine No.</FormLabel>
+                      <FormLabel className={formLabelStyle}>M/C No</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl><SelectTrigger><SelectValue placeholder="Select machine" /></SelectTrigger></FormControl>
+                        <FormControl><SelectTrigger className="h-9"><SelectValue placeholder="M/C" /></SelectTrigger></FormControl>
                         <SelectContent>
                           {machineOptions.map(num => <SelectItem key={num} value={num}>{num}</SelectItem>)}
                         </SelectContent>
@@ -318,8 +318,8 @@ export default function AddEfficiencyRecordPage() {
                   name="stops"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Stops</FormLabel>
-                      <FormControl><Input type="number" {...field} /></FormControl>
+                      <FormLabel className={formLabelStyle}>Stops</FormLabel>
+                      <FormControl><Input type="number" {...field} className="h-9" /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -329,8 +329,8 @@ export default function AddEfficiencyRecordPage() {
                   name="weftMeter"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Cloth Length (Weft Meter)</FormLabel>
-                      <FormControl><Input type="number" step="0.1" {...field} /></FormControl>
+                      <FormLabel className={formLabelStyle}>Weft(m)</FormLabel>
+                      <FormControl><Input type="number" step="0.1" {...field} className="h-9" /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -340,8 +340,8 @@ export default function AddEfficiencyRecordPage() {
                   name="total"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Total Time</FormLabel>
-                      <FormControl><Input placeholder="HH:MM:SS" {...field} /></FormControl>
+                      <FormLabel className={formLabelStyle}>Total</FormLabel>
+                      <FormControl><Input placeholder="HH:MM:SS" {...field} className="h-9" /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -351,14 +351,14 @@ export default function AddEfficiencyRecordPage() {
                   name="run"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Run Time</FormLabel>
-                      <FormControl><Input placeholder="HH:MM:SS" {...field} /></FormControl>
+                      <FormLabel className={formLabelStyle}>Run</FormLabel>
+                      <FormControl><Input placeholder="HH:MM:SS" {...field} className="h-9" /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
-              <Button type="submit" className="w-full bg-primary hover:bg-primary/90">
+              <Button type="submit" className="w-full bg-primary hover:bg-primary/90 mt-6">
                 <Save className="mr-2 h-4 w-4" /> Save Record
               </Button>
             </form>

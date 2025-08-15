@@ -15,6 +15,7 @@ import { useAppState } from '@/hooks/use-app-state';
 import { processRecord } from '@/lib/calculations';
 import type { CalculatedLoomRecord } from '@/lib/types';
 import WhatsAppIcon from '@/components/WhatsAppIcon';
+import { cn } from '@/lib/utils';
 
 export default function EfficiencyPage() {
   const { records, deleteRecord, settings } = useAppState();
@@ -57,6 +58,7 @@ export default function EfficiencyPage() {
           <Table className="text-xs">
             <TableHeader>
               <TableRow>
+                <TableHead>Shift</TableHead>
                 <TableHead>Time</TableHead>
                 <TableHead>M/C</TableHead>
                 <TableHead>Stops</TableHead>
@@ -71,7 +73,12 @@ export default function EfficiencyPage() {
             </TableHeader>
             <TableBody>
               {data.map(record => (
-                <TableRow key={record.id}>
+                <TableRow key={record.id} className={cn(
+                  'font-bold',
+                  record.shift === 'Day' && 'text-blue-600',
+                  record.shift === 'Night' && 'text-red-600'
+                )}>
+                  <TableCell>{record.shift}</TableCell>
                   <TableCell>{record.time}</TableCell>
                   <TableCell>{record.machineNo}</TableCell>
                   <TableCell>{record.stops}</TableCell>
