@@ -40,20 +40,20 @@ const prompt = ai.definePrompt({
   name: 'scanLoomDisplayPrompt',
   input: {schema: ScanLoomDisplayInputSchema},
   output: {schema: ScanLoomDisplayOutputSchema},
-  prompt: `You are an expert in optical character recognition (OCR) and data extraction from images of loom output displays.
+  prompt: `You are an expert in optical character recognition (OCR) and data extraction from images of loom output displays. Your primary task is to extract specific information from the provided image with the highest possible accuracy.
 
-You will receive an image of a loom output display. Your task is to extract the following information with high accuracy. Do not miss any fields if they are present in the image.
+Analyze the image provided and extract the following fields. Be meticulous and ensure every piece of data is captured correctly.
 
-- Date (DD/MM/YYYY): The date displayed on the loom.
-- Time (HH:MM): The time displayed on the loom.
-- Shift: 'A' corresponds to 'Day', and 'B' corresponds to 'Night'.
-- Machine No.: The machine number is physically engraved on the steel plate located at the very bottom of the image. It is separate from the digital screen. Extract only the number from this plate.
-- Stops: Get this value from the "All stops" field on the display.
-- Weft Meter: Get this value from the "Cloth length" field on the display.
-- Total: Get this value from the "Total time" field. Format as HH:MM:SS.
-- Run: Get this value from the "Run time len" field. Format as HH:MM:SS.
+1.  **Date**: Find the date on the display. It should be in DD/MM/YYYY format.
+2.  **Time**: Find the time on the display. It should be in HH:MM format.
+3.  **Shift**: Identify the shift. Look for a letter, usually 'A' or 'B'. 'A' corresponds to the 'Day' shift, and 'B' corresponds to the 'Night' shift.
+4.  **Machine No.**: This is a critical field. The machine number is physically engraved on a steel plate located at the very bottom of the image, separate from the digital screen. Extract only the numeric value from this plate.
+5.  **Stops**: Locate the field labeled "All stops" on the digital display and extract its numeric value.
+6.  **Weft Meter**: Locate the field labeled "Cloth length" on the digital display. This is the weft meter value. Extract the numeric value.
+7.  **Total Time**: Find the "Total time" field on the display and extract its value. Ensure the format is HH:MM:SS.
+8.  **Run Time**: Find the "Run time len" field on the display. This is the run time. Extract its value. Ensure the format is HH:MM:SS.
 
-Return the extracted data in JSON format. If a field is not found or unreadable, leave that field blank.
+Return the extracted data in a structured JSON format. If any field is not present or unreadable, leave it blank, but do your best to extract all available information.
 
 Image: {{media url=photoDataUri}}
 `,
