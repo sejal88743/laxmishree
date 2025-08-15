@@ -43,6 +43,18 @@ export default function AddEfficiencyRecordPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      date: new Date(),
+      time: format(new Date(), 'HH:mm'),
+      stops: 0,
+      weftMeter: 0,
+      total: '00:00:00',
+      run: '00:00:00',
+    },
+  });
+
   useEffect(() => {
     if (!showCamera) return;
     const getCameraPermission = async () => {
