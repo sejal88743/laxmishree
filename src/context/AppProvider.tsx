@@ -83,43 +83,44 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.supabaseUrl, settings.supabaseKey, isInitialized]);
 
+  const processPending = useCallback(async () => {
+    if (!supabaseClient || pendingSync.length === 0) return;
+    
+    toast({title: `Syncing ${pendingSync.length} offline changes...`})
+
+    const remainingOps: PendingSyncOperation[] = [];
+    
+    for (const op of pendingSync) {
+        let success = false;
+        try {
+            if (op.type === 'add' || op.type === 'update') {
+                const { error } = await supabaseClient.from('loom_records').upsert(op.record);
+                if (error) throw error;
+            } else if (op.type === 'delete') {
+                const { error } = await supabaseClient.from('loom_records').delete().eq('id', op.id);
+                if (error) throw error;
+            }
+            success = true;
+        } catch (error) {
+            console.error('Failed to sync pending operation:', op, error);
+            remainingOps.push(op);
+        }
+    }
+
+    setPendingSync(remainingOps);
+
+    if(remainingOps.length === 0) {
+        toast({ title: 'Sync complete!', description: 'All offline changes have been saved.' });
+    } else {
+        toast({ title: 'Sync failed', description: `${remainingOps.length} changes could not be synced.`, variant: 'destructive'})
+    }
+  }, [pendingSync, supabaseClient]);
 
   // Effect for handling data synchronization and real-time subscriptions
   useEffect(() => {
     if (!supabaseClient) {
       return;
     }
-    
-    const processPending = async () => {
-        if (pendingSync.length === 0) return;
-        
-        toast({title: `Syncing ${pendingSync.length} offline changes...`})
-
-        const remainingOps: PendingSyncOperation[] = [];
-        
-        for (const op of pendingSync) {
-            let success = false;
-            try {
-                if (op.type === 'add' || op.type === 'update') {
-                    const { error } = await supabaseClient.from('loom_records').upsert(op.record);
-                    if (error) throw error;
-                } else if (op.type === 'delete') {
-                    const { error } = await supabaseClient.from('loom_records').delete().eq('id', op.id);
-                    if (error) throw error;
-                }
-                success = true;
-            } catch (error) {
-                console.error('Failed to sync pending operation:', op, error);
-                remainingOps.push(op);
-            }
-        }
-        setPendingSync(remainingOps);
-        if(remainingOps.length === 0) {
-            toast({ title: 'Sync complete!', description: 'All offline changes have been saved.' });
-        } else {
-            toast({ title: 'Sync failed', description: `${remainingOps.length} changes could not be synced.`, variant: 'destructive'})
-        }
-    };
     
     const setupSubscriptions = async () => {
         setInitialSyncComplete(false);
@@ -153,7 +154,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
             setSupabaseStatus('connected');
             toast({ title: "Connected to Supabase", description: "Data is live." });
-            setInitialSyncComplete(true);
+            setInitialSyncComplete(true); // Signal that initial data load is complete
             
         } catch (error) {
             console.error('Initial fetch from Supabase failed:', error);
@@ -210,11 +211,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     };
 
     setupSubscriptions();
-    
-    // Process pending changes ONLY after initial sync is complete and connection is stable
-    if(initialSyncComplete && supabaseStatus === 'connected') {
-        processPending();
-    }
 
     return () => {
       if (recordsChannel.current) supabaseClient.removeChannel(recordsChannel.current);
@@ -223,6 +219,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabaseClient]);
+
+  // Process pending changes ONLY after initial sync is complete
+  useEffect(() => {
+      if(initialSyncComplete && supabaseStatus === 'connected') {
+          processPending();
+      }
+  }, [initialSyncComplete, supabaseStatus, processPending]);
 
 
   const syncOrQueue = async (op: PendingSyncOperation) => {
