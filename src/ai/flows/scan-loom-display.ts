@@ -47,7 +47,7 @@ You will receive an image of a loom output display. Your task is to extract the 
 - Date (DD/MM/YYYY): The date displayed on the loom.
 - Time (HH:MM): The time displayed on the loom.
 - Shift: 'A' corresponds to 'Day', and 'B' corresponds to 'Night'.
-- Machine No.: The machine number is written on the steel plate at the very bottom of the image. It is a physical number on the machine, not on the screen.
+- Machine No.: The machine number is physically engraved on the steel plate located at the very bottom of the image. It is separate from the digital screen. Extract only the number from this plate.
 - Stops: Get this value from the "All stops" field on the display.
 - Weft Meter: Get this value from the "Cloth length" field on the display.
 - Total: Get this value from the "Total time" field. Format as HH:MM:SS.
