@@ -50,8 +50,8 @@ export default function EfficiencyPage() {
 
   const renderRecordsTable = (title: string, data: CalculatedLoomRecord[]) => (
     <Card>
-      <CardHeader>
-        <CardTitle className="text-primary">{title}</CardTitle>
+      <CardHeader className="p-2">
+        <CardTitle className="text-primary text-xs font-bold">{title}</CardTitle>
       </CardHeader>
       <CardContent className="p-0">
         <div className="overflow-x-auto">
