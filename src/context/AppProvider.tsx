@@ -111,8 +111,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             let success = false;
             try {
                 if (op.type === 'add' || op.type === 'update') {
-                    const { user_id, ...recordToSync } = op.record;
-                    const { error } = await supabaseClient.from('loom_records').upsert(recordToSync);
+                    const { error } = await supabaseClient.from('loom_records').upsert(op.record);
                     if (error) throw error;
                 } else if (op.type === 'delete') {
                     const { error } = await supabaseClient.from('loom_records').delete().eq('id', op.id);
@@ -236,8 +235,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       if (supabaseStatus === 'connected' && supabaseClient && initialSyncComplete) {
           try {
               if (op.type === 'add' || op.type === 'update') {
-                  const { user_id, ...recordToSync } = op.record;
-                  const { error } = await supabaseClient.from('loom_records').upsert(recordToSync);
+                  const { error } = await supabaseClient.from('loom_records').upsert(op.record);
                   if (error) throw error;
               } else if (op.type === 'delete') {
                   const { error } = await supabaseClient.from('loom_records').delete().eq('id', op.id);
@@ -291,7 +289,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     
     if (supabaseStatus === 'connected' && supabaseClient) {
         try {
-            const { supabaseKey, geminiApiKey, user_id, ...settingsToSave } = updatedSettings;
+            const { supabaseKey, geminiApiKey, ...settingsToSave } = updatedSettings;
             const settingsWithId = { ...settingsToSave, id: GLOBAL_SETTINGS_ID };
             const { error } = await supabaseClient.from('settings').upsert(settingsWithId);
             if(error) throw error;
