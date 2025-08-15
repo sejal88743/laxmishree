@@ -39,6 +39,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [supabaseClient, setSupabaseClient] = useState<SupabaseClient | null>(null);
   const [supabaseStatus, setSupabaseStatus] = useState<SupabaseStatus>('disconnected');
   const [pendingSync, setPendingSync] = useState<PendingSyncOperation[]>([]);
+  const [initialSyncComplete, setInitialSyncComplete] = useState(false);
   
   const recordsChannel = useRef<RealtimeChannel | null>(null);
   const settingsChannel = useRef<RealtimeChannel | null>(null);
@@ -65,38 +66,43 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     const { supabaseUrl, supabaseKey } = settings;
     if (supabaseUrl && supabaseKey) {
-      const client = createClient(supabaseUrl, supabaseKey);
-      setSupabaseClient(client);
-      setSupabaseStatus('reconnecting');
-
-      return () => {
-        client.removeAllChannels();
-        setSupabaseClient(null);
-        recordsChannel.current = null;
-        settingsChannel.current = null;
-      };
+      if (!supabaseClient) {
+          const client = createClient(supabaseUrl, supabaseKey);
+          setSupabaseClient(client);
+          setSupabaseStatus('reconnecting');
+      }
     } else {
-      setSupabaseClient(null);
-      setSupabaseStatus('disconnected');
+        if(supabaseClient) {
+            supabaseClient.removeAllChannels();
+            setSupabaseClient(null);
+        }
+        setSupabaseStatus('disconnected');
     }
-  }, [settings.supabaseUrl, settings.supabaseKey, isInitialized]);
+  }, [settings.supabaseUrl, settings.supabaseKey, isInitialized, supabaseClient]);
 
-  // 4. Process pending queue when connection is established
-  const processPending = useCallback(async (client: SupabaseClient) => {
-    if (isSyncing.current || pendingSync.length === 0) return;
-    
+
+  const processPending = useCallback(async () => {
+    if (!supabaseClient || isSyncing.current || pendingSync.length === 0) return;
+  
     isSyncing.current = true;
     toast({ title: `Syncing ${pendingSync.length} offline changes...` });
-
+  
     const remainingOps: PendingSyncOperation[] = [];
-
-    for (const op of pendingSync) {
+    let opsToProcess = [...pendingSync];
+  
+    for (const op of opsToProcess) {
       try {
         if (op.type === 'add' || op.type === 'update') {
-          const { error } = await client.from('loom_records').upsert(op.record);
+          // Ensure numeric types are correct
+          const recordToUpsert = {
+            ...op.record,
+            weftMeter: parseFloat(op.record.weftMeter as any),
+            stops: parseInt(op.record.stops as any, 10),
+          };
+          const { error } = await supabaseClient.from('loom_records').upsert(recordToUpsert);
           if (error) throw error;
         } else if (op.type === 'delete') {
-          const { error } = await client.from('loom_records').delete().eq('id', op.id);
+          const { error } = await supabaseClient.from('loom_records').delete().eq('id', op.id);
           if (error) throw error;
         }
       } catch (error) {
@@ -104,45 +110,47 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         remainingOps.push(op);
       }
     }
-
+  
     if (remainingOps.length < pendingSync.length) {
-        const successCount = pendingSync.length - remainingOps.length;
+      const successCount = pendingSync.length - remainingOps.length;
+      if (successCount > 0) {
         toast({ title: 'Sync complete!', description: `${successCount} change(s) have been saved.` });
+      }
     }
-    
+  
     if (remainingOps.length > 0) {
-        toast({ title: 'Sync partially failed', description: `${remainingOps.length} changes could not be synced. Will retry.`, variant: 'destructive' });
+      toast({ title: 'Sync partially failed', description: `${remainingOps.length} changes could not be synced. Will retry.`, variant: 'destructive' });
     }
-
+  
     setPendingSync(remainingOps);
     isSyncing.current = false;
-  }, [pendingSync]);
+  }, [pendingSync, supabaseClient]);
+
+  // Process pending changes ONLY after initial sync is complete and connection is stable
+  useEffect(() => {
+      if(initialSyncComplete && supabaseStatus === 'connected') {
+          processPending();
+      }
+  }, [initialSyncComplete, supabaseStatus, processPending]);
 
 
   // 5. Setup subscriptions and initial data fetch
   useEffect(() => {
-    if (!supabaseClient) {
-      setSupabaseStatus('disconnected');
+    if (!supabaseClient || !isInitialized) {
       return;
     }
+    
+    let isSubscribed = true;
 
     const setup = async () => {
+      if (initialSyncComplete) return;
+
       setSupabaseStatus('reconnecting');
       try {
-        // Fetch initial data
-        const { data: initialRecords, error: recordsError } = await supabaseClient.from('loom_records').select('*');
-        if (recordsError) throw recordsError;
-        
-        const localRecords = getFromLocalStorage<LoomRecord[]>(LOCAL_RECORDS_STORAGE_KEY, []);
-        const remoteRecordsMap = new Map((initialRecords || []).map(r => [r.id, r]));
-        const mergedRecords = localRecords.filter(lr => !remoteRecordsMap.has(lr.id)).concat(initialRecords || []);
-        setRecords(mergedRecords);
-        saveToLocalStorage(LOCAL_RECORDS_STORAGE_KEY, mergedRecords);
-
-        // Fetch settings
+        // Fetch initial settings
         const { data: initialSettings, error: settingsError } = await supabaseClient.from('settings').select('*').eq('id', GLOBAL_SETTINGS_ID).limit(1).single();
         if (settingsError && settingsError.code !== 'PGRST116') throw settingsError;
-        if(initialSettings) {
+        if(initialSettings && isSubscribed) {
             setSettings(prev => {
                 const newSettings = { ...prev, ...initialSettings };
                 saveToLocalStorage(LOCAL_SETTINGS_STORAGE_KEY, newSettings);
@@ -150,14 +158,28 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             });
         }
         
-        setSupabaseStatus('connected');
-        toast({ title: "Connected to Supabase", description: "Data is live." });
-        processPending(supabaseClient);
+        // Fetch initial data
+        const { data: initialRecords, error: recordsError } = await supabaseClient.from('loom_records').select('*');
+        if (recordsError) throw recordsError;
+        
+        if (isSubscribed) {
+            const localRecords = getFromLocalStorage<LoomRecord[]>(LOCAL_RECORDS_STORAGE_KEY, []);
+            const remoteRecordsMap = new Map((initialRecords || []).map(r => [r.id, r]));
+            const mergedRecords = localRecords.filter(lr => !remoteRecordsMap.has(lr.id)).concat(initialRecords || []);
+            setRecords(mergedRecords);
+            saveToLocalStorage(LOCAL_RECORDS_STORAGE_KEY, mergedRecords);
+
+            setSupabaseStatus('connected');
+            toast({ title: "Connected to Supabase", description: "Data is live." });
+            setInitialSyncComplete(true);
+        }
         
       } catch (error) {
         console.error('Initial fetch from Supabase failed:', error);
-        setSupabaseStatus('disconnected');
-        toast({ title: 'Connection Failed', description: 'Could not fetch data from Supabase.', variant: 'destructive' });
+        if (isSubscribed) {
+            setSupabaseStatus('disconnected');
+            toast({ title: 'Connection Failed', description: 'Could not fetch data from Supabase.', variant: 'destructive' });
+        }
         return;
       }
     };
@@ -186,56 +208,34 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           saveToLocalStorage(LOCAL_RECORDS_STORAGE_KEY, newRecords);
           return newRecords;
         });
-      }).subscribe((status) => {
+      }).subscribe((status, err) => {
           if (status === 'SUBSCRIBED') {
-              setSupabaseStatus('connected');
+              if (supabaseStatus !== 'connected') setSupabaseStatus('connected');
           } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-              setSupabaseStatus('disconnected');
-          } else if (status === 'CLOSED') {
-              setSupabaseStatus('disconnected');
+              if (supabaseStatus !== 'disconnected') setSupabaseStatus('disconnected');
+          }
+          if (err) {
+            console.error('Realtime subscription error:', err);
+            setSupabaseStatus('reconnecting');
+            setTimeout(() => setup(), 5000);
           }
       });
 
-    const connectionStatusChange = supabaseClient.auth.onAuthStateChange(() => {
-        if (supabaseClient.auth.getSession()) {
-            if (supabaseStatus !== 'connected') {
-                setSupabaseStatus('reconnecting');
-                setup(); // Re-run setup on reconnect
-            }
-        }
-    });
-
     return () => {
+      isSubscribed = false;
       supabaseClient.removeAllChannels();
       recordsChannel.current = null;
       settingsChannel.current = null;
-      connectionStatusChange.data.subscription.unsubscribe();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supabaseClient]);
+  }, [supabaseClient, isInitialized, initialSyncComplete]);
 
 
   const syncOrQueue = useCallback((op: PendingSyncOperation) => {
+    setPendingSync(prev => [...prev, op]);
     if (supabaseClient && supabaseStatus === 'connected') {
-      // Don't queue if we are online, just do it.
-      (async () => {
-        try {
-          if (op.type === 'add' || op.type === 'update') {
-            const { error } = await supabaseClient.from('loom_records').upsert(op.record);
-            if (error) throw error;
-          } else if (op.type === 'delete') {
-            const { error } = await supabaseClient.from('loom_records').delete().eq('id', op.id);
-            if (error) throw error;
-          }
-        } catch(e) {
-          toast({ title: 'Sync failed', description: 'Saving change for later.', variant: 'destructive' });
-          setPendingSync(prev => [...prev, op]);
-        }
-      })();
-    } else {
-      setPendingSync(prev => [...prev, op]);
+      processPending();
     }
-  }, [supabaseClient, supabaseStatus]);
+  }, [supabaseClient, supabaseStatus, processPending]);
 
   const addRecord = useCallback((record: Omit<LoomRecord, 'id'>) => {
     const newRecord: LoomRecord = { ...record, id: crypto.randomUUID() };
@@ -274,7 +274,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         try {
             const { supabaseKey, geminiApiKey, ...settingsToSave } = updatedSettings;
             const settingsWithId = { ...settingsToSave, id: GLOBAL_SETTINGS_ID };
-            const { error } = await supabaseClient.from('settings').upsert(settingsWithId);
+            const { error } = await supabaseClient.from('settings').upsert(settingsWithId, { onConflict: 'id' });
             if(error) throw error;
             toast({ title: 'Settings saved to Supabase.' });
         } catch(e) {
