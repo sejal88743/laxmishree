@@ -56,8 +56,8 @@ export default function SettingsPage() {
   };
 
   const supabaseLoomRecordsScript = `
--- Create loom_records table
-CREATE TABLE loom_records (
+-- Create loom_records table if it doesn't exist
+CREATE TABLE IF NOT EXISTS public.loom_records (
   id UUID PRIMARY KEY,
   user_id UUID REFERENCES auth.users(id) NOT NULL DEFAULT auth.uid(),
   date DATE NOT NULL,
@@ -72,60 +72,52 @@ CREATE TABLE loom_records (
 );
 
 -- Enable Row Level Security
-ALTER TABLE loom_records ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.loom_records ENABLE ROW LEVEL SECURITY;
 
--- Policy: Users can see their own records
-CREATE POLICY "user_select_own_records"
-ON loom_records FOR SELECT
-USING (auth.uid() = user_id);
+-- Drop existing policies before creating new ones
+DROP POLICY IF EXISTS "user_select_own_records" ON public.loom_records;
+CREATE POLICY "user_select_own_records" ON public.loom_records FOR SELECT USING (auth.uid() = user_id);
 
--- Policy: Users can insert their own records
-CREATE POLICY "user_insert_own_records"
-ON loom_records FOR INSERT
-WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "user_insert_own_records" ON public.loom_records;
+CREATE POLICY "user_insert_own_records" ON public.loom_records FOR INSERT WITH CHECK (auth.uid() = user_id);
 
--- Policy: Users can update their own records
-CREATE POLICY "user_update_own_records"
-ON loom_records FOR UPDATE
-USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "user_update_own_records" ON public.loom_records;
+CREATE POLICY "user_update_own_records" ON public.loom_records FOR UPDATE USING (auth.uid() = user_id);
 
--- Policy: Users can delete their own records
-CREATE POLICY "user_delete_own_records"
-ON loom_records FOR DELETE
-USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "user_delete_own_records" ON public.loom_records;
+CREATE POLICY "user_delete_own_records" ON public.loom_records FOR DELETE USING (auth.uid() = user_id);
 
--- Enable Realtime on the table
-ALTER PUBLICATION supabase_realtime ADD TABLE loom_records;
+-- Add table to publication for realtime
+ALTER PUBLICATION supabase_realtime ADD TABLE public.loom_records;
   `.trim();
 
   const supabaseSettingsScript = `
--- Create settings table
-CREATE TABLE settings (
+-- Create settings table if it doesn't exist
+CREATE TABLE IF NOT EXISTS public.settings (
   user_id UUID PRIMARY KEY DEFAULT auth.uid(),
-  total_machines INT NOT NULL,
-  low_efficiency_threshold INT NOT NULL,
-  whatsapp_number TEXT,
-  message_template TEXT
+  total_machines INT NOT NULL DEFAULT 10,
+  low_efficiency_threshold INT NOT NULL DEFAULT 90,
+  whatsapp_number TEXT DEFAULT '',
+  message_template TEXT DEFAULT 'Record Details:\nDate: {{date}}\nTime: {{time}}\nShift: {{shift}}\nMachine: {{machineNo}}\nEfficiency: {{efficiency}}%'
 );
 
 -- Enable Row Level Security
-ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;
 
--- Policy: Users can manage their own settings
-CREATE POLICY "user_manage_own_settings"
-ON settings FOR ALL
-USING (auth.uid() = user_id)
-WITH CHECK (auth.uid() = user_id);
+-- Drop existing policy before creating a new one
+DROP POLICY IF EXISTS "user_manage_own_settings" ON public.settings;
+CREATE POLICY "user_manage_own_settings" ON public.settings FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
--- Enable Realtime on the table
-ALTER PUBLICATION supabase_realtime ADD TABLE settings;
+-- Add table to publication for realtime
+ALTER PUBLICATION supabase_realtime ADD TABLE public.settings;
 
--- Function to insert default settings for new user
+
+-- Function to insert default settings for a new user
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.settings (user_id, total_machines, low_efficiency_threshold, whatsapp_number, message_template)
-  VALUES (new.id, 10, 90, '', 'Record Details:\nDate: {{date}}\nTime: {{time}}\nShift: {{shift}}\nMachine: {{machineNo}}\nEfficiency: {{efficiency}}%');
+  INSERT INTO public.settings (user_id)
+  VALUES (new.id);
   RETURN new;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
