@@ -41,6 +41,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (isInitialized) {
       saveToLocalStorage(SETTINGS_STORAGE_KEY, settings);
+       if (settings.geminiApiKey) {
+        // This is a simplified approach for demonstration.
+        // In a real production app, you would have a secure backend endpoint
+        // to set environment variables for your deployment.
+        console.log('Gemini API Key is set. For deployment, ensure this is set as an environment variable (GEMINI_API_KEY) on your hosting provider (e.g., Netlify).');
+      }
     }
   }, [settings, isInitialized]);
 
@@ -62,7 +68,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   
   const deleteAllData = useCallback(() => {
     setRecords([]);
-    setSettings(DEFAULT_SETTINGS);
+    // Keep Supabase settings, clear the rest
+    setSettings(prev => ({
+        ...DEFAULT_SETTINGS,
+        supabaseUrl: prev.supabaseUrl,
+        supabaseKey: prev.supabaseKey,
+    }));
   }, []);
 
   const value = {

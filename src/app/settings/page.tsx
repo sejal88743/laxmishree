@@ -55,7 +55,7 @@ export default function SettingsPage() {
     }
   };
 
-  const supabaseScript = `
+  const supabaseLoomRecordsScript = `
 CREATE TABLE loom_records (
   id TEXT PRIMARY KEY,
   date DATE NOT NULL,
@@ -65,7 +65,20 @@ CREATE TABLE loom_records (
   stops INTEGER NOT NULL,
   weft_meter REAL NOT NULL,
   total_time INTERVAL NOT NULL,
-  run_time INTERVAL NOT NULL
+  run_time INTERVAL NOT NULL,
+  user_id UUID DEFAULT auth.uid()
+);
+  `.trim();
+
+  const supabaseSettingsScript = `
+CREATE TABLE settings (
+  id INT PRIMARY KEY DEFAULT 1,
+  user_id UUID DEFAULT auth.uid(),
+  total_machines INT NOT NULL,
+  low_efficiency_threshold INT NOT NULL,
+  whatsapp_number TEXT,
+  message_template TEXT,
+  CONSTRAINT single_row CHECK (id = 1)
 );
   `.trim();
 
@@ -94,7 +107,7 @@ CREATE TABLE loom_records (
           </Card>
 
           <Card>
-            <CardHeader><CardTitle className="text-primary">API Settings</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-primary">API Settings</CardTitle><CardDescription>This API key will be stored as an environment variable for security.</CardDescription></CardHeader>
             <CardContent className="space-y-4">
               <FormField control={form.control} name="geminiApiKey" render={({ field }) => (
                 <FormItem>
@@ -129,7 +142,7 @@ CREATE TABLE loom_records (
           <Card>
             <CardHeader>
               <CardTitle className="text-primary">Supabase Integration</CardTitle>
-              <CardDescription>Optional: Sync data to a Supabase backend.</CardDescription>
+              <CardDescription>Sync data to a Supabase backend. Run the SQL scripts below in your Supabase SQL editor.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <FormField control={form.control} name="supabaseUrl" render={({ field }) => (
@@ -147,8 +160,12 @@ CREATE TABLE loom_records (
                 </FormItem>
               )} />
                <div>
-                <FormLabel>Table Script</FormLabel>
-                <Textarea readOnly value={supabaseScript} className="font-mono text-xs mt-2" rows={10} />
+                <FormLabel>Loom Records Table Script</FormLabel>
+                <Textarea readOnly value={supabaseLoomRecordsScript} className="font-mono text-xs mt-2" rows={11} />
+              </div>
+               <div>
+                <FormLabel>Settings Table Script</FormLabel>
+                <Textarea readOnly value={supabaseSettingsScript} className="font-mono text-xs mt-2" rows={10} />
               </div>
             </CardContent>
           </Card>
@@ -165,17 +182,17 @@ CREATE TABLE loom_records (
           </CardHeader>
           <CardContent>
             <p className="text-sm mb-4">
-                This action is irreversible. It will delete all records and reset all settings stored in this browser.
+                This action is irreversible. It will delete all records and settings from this browser's local storage.
             </p>
             <AlertDialog>
                 <AlertDialogTrigger asChild>
-                    <Button variant="destructive"><Trash2 className="mr-2 h-4 w-4"/> Delete All Data</Button>
+                    <Button variant="destructive"><Trash2 className="mr-2 h-4 w-4"/> Delete All Local Data</Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            This will permanently delete all data. To confirm, type "DELETE" in the box below.
+                            This will permanently delete all data from local storage. To confirm, type "DELETE" in the box below.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <Input 
