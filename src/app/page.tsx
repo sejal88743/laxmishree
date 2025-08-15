@@ -11,6 +11,7 @@ import { useAppState } from '@/hooks/use-app-state';
 import { calculateEfficiency, timeToSeconds } from '@/lib/calculations';
 import type { LoomRecord } from '@/lib/types';
 import WhatsAppIcon from '@/components/WhatsAppIcon';
+import { format } from 'date-fns';
 
 export default function Dashboard() {
   const { records, settings } = useAppState();
@@ -92,7 +93,7 @@ export default function Dashboard() {
           const totalTime = dateRecords.reduce((sum, r) => sum + timeToSeconds(r.total), 0);
           const totalStops = dateRecords.reduce((sum, r) => sum + r.stops, 0);
           return { 
-            date: new Date(date).toLocaleDateString('en-GB', {day:'2-digit', month: '2-digit', year: 'numeric'}), 
+            date: format(new Date(date), 'dd/MM/yy'),
             efficiency: calculateEfficiency(totalRun, totalTime),
             stops: totalStops
           };
@@ -129,10 +130,13 @@ export default function Dashboard() {
       alert("Please set a WhatsApp number in settings.");
       return;
     }
-    const messageLines = lowEfficiencyAlerts.map(alert => 
-      `Machine ${alert.machineNo}:\n` +
-      alert.data.map(d => `  - Date: ${d.date}, Eff: ${d.efficiency.toFixed(2)}%, Stops: ${d.stops}`).join('\n')
-    );
+    const messageLines = lowEfficiencyAlerts.map(alert => {
+      const machineLines = alert.data.map(d =>
+        `-- ${d.date} : *EFFI-${d.efficiency.toFixed(0)}%*, STOPS-${d.stops}`
+      ).join('\n');
+      return `Machine ${alert.machineNo}:\n${machineLines}`;
+    });
+    
     const message = encodeURIComponent(`Low Efficiency Alert:\n\n${messageLines.join('\n\n')}`);
     window.open(`https://wa.me/${settings.whatsAppNumber}?text=${message}`);
   };
