@@ -131,6 +131,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
+    // Process pending changes ONLY after initial sync is complete
+    useEffect(() => {
+        if(initialSyncComplete && supabaseStatus === 'connected') {
+            processPending();
+        }
+    }, [initialSyncComplete, supabaseStatus]);
+
 
     const setupSubscriptions = async () => {
         setInitialSyncComplete(false);
@@ -166,8 +173,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             setInitialSyncComplete(true);
             toast({ title: "Connected to Supabase", description: "Data is live." });
             
-            await processPending();
-
         } catch (error) {
             console.error('Initial fetch from Supabase failed:', error);
             setSupabaseStatus('disconnected');
@@ -262,7 +267,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         return updated;
     });
     syncOrQueue({ type: 'add', record: newRecord });
-  }, []);
+  }, [initialSyncComplete, supabaseStatus]);
 
   const updateRecord = useCallback((updatedRecord: LoomRecord) => {
     setRecords(prev => {
@@ -271,7 +276,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         return updated;
     });
     syncOrQueue({ type: 'update', record: updatedRecord });
-  }, []);
+  }, [initialSyncComplete, supabaseStatus]);
 
   const deleteRecord = useCallback((id: string) => {
     setRecords(prev => {
@@ -280,7 +285,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         return updated;
     });
     syncOrQueue({ type: 'delete', id });
-  }, []);
+  }, [initialSyncComplete, supabaseStatus]);
 
   const updateSettings = useCallback(async (newSettings: Partial<AppSettings>) => {
     const updatedSettings = { ...settings, ...newSettings };
