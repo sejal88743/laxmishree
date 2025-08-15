@@ -57,23 +57,28 @@ export default function Dashboard() {
 
   const lowEfficiencyAlerts = useMemo(() => {
     const threeDaysAgo = new Date(today);
-    threeDaysAgo.setDate(today.getDate() - 3);
+    threeDaysAgo.setDate(today.getDate() - 2); // 3 days including today
+    threeDaysAgo.setHours(0,0,0,0);
+
     const recentRecords = records.filter(r => new Date(r.date) >= threeDaysAgo);
     
-    const machineEfficiencies: { [key: string]: { totalRun: number, totalTime: number, efficiencies: {date: string, efficiency: number}[] } } = {};
+    const machineEfficiencies: { [key: string]: { totalRun: number, totalTime: number, recordCount: number } } = {};
 
     recentRecords.forEach(r => {
       if (!machineEfficiencies[r.machineNo]) {
-        machineEfficiencies[r.machineNo] = { totalRun: 0, totalTime: 0, efficiencies: [] };
+        machineEfficiencies[r.machineNo] = { totalRun: 0, totalTime: 0, recordCount: 0 };
       }
       machineEfficiencies[r.machineNo].totalRun += timeToSeconds(r.run);
       machineEfficiencies[r.machineNo].totalTime += timeToSeconds(r.total);
+      machineEfficiencies[r.machineNo].recordCount++;
     });
     
     const alerts: { machineNo: string; avgEfficiency: number, data: {date: string, efficiency: number}[] }[] = [];
     Object.entries(machineEfficiencies).forEach(([machineNo, data]) => {
+      if (data.recordCount === 0) return;
+
       const avgEfficiency = calculateEfficiency(data.totalRun, data.totalTime);
-      if (avgEfficiency < (settings.lowEfficiencyThreshold || 90)) {
+      if (avgEfficiency < settings.lowEfficiencyThreshold) {
         
         const machineRecordsByDate: {[key: string]: LoomRecord[]} = {};
         recentRecords.filter(r => r.machineNo === machineNo).forEach(r => {
@@ -85,7 +90,7 @@ export default function Dashboard() {
           const totalRun = dateRecords.reduce((sum, r) => sum + timeToSeconds(r.run), 0);
           const totalTime = dateRecords.reduce((sum, r) => sum + timeToSeconds(r.total), 0);
           return { date: new Date(date).toLocaleDateString('en-GB'), efficiency: calculateEfficiency(totalRun, totalTime) };
-        });
+        }).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
         alerts.push({ machineNo, avgEfficiency, data: efficiencyByDate });
       }
@@ -174,7 +179,7 @@ export default function Dashboard() {
                     <AlertDescription className="mt-2 text-sm">
                         {lowEfficiencyAlerts.map(alert => (
                         <div key={alert.machineNo} className="mb-1">
-                            Machine <strong>{alert.machineNo}</strong> is at <strong>{alert.avgEfficiency.toFixed(2)}%</strong> avg. efficiency.
+                            Machine <strong>{alert.machineNo}</strong> is at <strong>{alert.avgEfficiency.toFixed(2)}%</strong> avg. efficiency (Threshold: {settings.lowEfficiencyThreshold}%)
                         </div>
                         ))}
                     </AlertDescription>
@@ -187,8 +192,8 @@ export default function Dashboard() {
                 <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
                     {Object.entries(performanceData).map(([machineNo, data]) => {
                     const trend = data.todayEfficiency - data.yesterdayEfficiency;
-                    const cardColor = data.todayEfficiency > 90 ? 'bg-green-100 border-green-300' : data.todayEfficiency > 80 ? 'bg-blue-100 border-blue-300' : 'bg-red-100 border-red-300';
-                    const textColor = data.todayEfficiency > 90 ? 'text-green-800' : data.todayEfficiency > 80 ? 'text-blue-800' : 'text-red-800';
+                    const cardColor = data.todayEfficiency >= settings.lowEfficiencyThreshold ? 'bg-green-100 border-green-300' : data.todayEfficiency > (settings.lowEfficiencyThreshold * 0.9) ? 'bg-blue-100 border-blue-300' : 'bg-red-100 border-red-300';
+                    const textColor = data.todayEfficiency >= settings.lowEfficiencyThreshold ? 'text-green-800' : data.todayEfficiency > (settings.lowEfficiencyThreshold * 0.9) ? 'text-blue-800' : 'text-red-800';
 
                     return (
                         <Card key={machineNo} className={`text-center shadow-md ${cardColor} ${textColor}`}>
@@ -256,5 +261,3 @@ export default function Dashboard() {
     </div>
   );
 }
-
-  
