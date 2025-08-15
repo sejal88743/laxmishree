@@ -150,8 +150,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             }
             
             if(initialSettings) {
-                setSettings(initialSettings);
-                saveToLocalStorage(LOCAL_SETTINGS_STORAGE_KEY, initialSettings);
+                setSettings(prevSettings => {
+                  const newSettings = { ...prevSettings, ...initialSettings};
+                  saveToLocalStorage(LOCAL_SETTINGS_STORAGE_KEY, newSettings);
+                  return newSettings;
+                });
             }
 
             setSupabaseStatus('connected');
@@ -170,8 +173,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         settingsChannel.current = supabaseClient.channel('settings-channel')
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'settings' }, (payload) => {
                 const newSettings = payload.new as AppSettings;
-                setSettings(newSettings);
-                saveToLocalStorage(LOCAL_SETTINGS_STORAGE_KEY, newSettings);
+                setSettings(prevSettings => {
+                  const updatedSettings = { ...prevSettings, ...newSettings };
+                  saveToLocalStorage(LOCAL_SETTINGS_STORAGE_KEY, updatedSettings);
+                  return updatedSettings;
+                });
                 toast({ title: 'Settings updated', description: 'Settings were updated from another device.' });
             })
             .subscribe((status) => {
@@ -239,14 +245,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
 
   const addRecord = useCallback((record: Omit<LoomRecord, 'id'>) => {
-    const newRecord = { ...record, id: crypto.randomUUID() };
+    const newRecord: LoomRecord = { 
+      ...record, 
+      id: crypto.randomUUID(),
+      user_id: settings.user_id 
+    };
     setRecords(prev => {
         const updated = [...prev, newRecord];
         saveToLocalStorage(LOCAL_RECORDS_STORAGE_KEY, updated);
         return updated;
     });
     syncOrQueue({ type: 'add', record: newRecord });
-  }, []);
+  }, [settings.user_id]);
 
   const updateRecord = useCallback((updatedRecord: LoomRecord) => {
     setRecords(prev => {
@@ -273,8 +283,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     
     if (supabaseStatus === 'connected' && supabaseClient) {
         try {
+            const { user_id, ...settingsToSave } = updatedSettings;
             // Use upsert to create if not exists, or update if it does.
-            const { error } = await supabaseClient.from('settings').upsert(updatedSettings);
+            const { error } = await supabaseClient.from('settings').upsert(settingsToSave);
             if(error) throw error;
             toast({ title: 'Settings saved to Supabase.' });
         } catch(e) {
