@@ -120,106 +120,106 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.settings;
 
 
   return (
-    <div className='space-y-2'>
+    <div className='space-y-2 p-1'>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2">
-          <Card className='border-0'>
-            <CardHeader><CardTitle className="text-primary">General Settings</CardTitle></CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Card className='border-0 shadow-none'>
+            <CardHeader className='p-2'><CardTitle className="text-primary text-lg">General Settings</CardTitle></CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-2 p-2">
               <FormField control={form.control} name="totalMachines" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Total Machines</FormLabel>
-                  <FormControl><Input type="number" {...field} /></FormControl>
+                  <FormLabel className="text-xs">Total Machines</FormLabel>
+                  <FormControl><Input type="number" {...field} className="h-8" /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
               <FormField control={form.control} name="lowEfficiencyThreshold" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Low Efficiency Threshold (%)</FormLabel>
-                  <FormControl><Input type="number" {...field} /></FormControl>
+                  <FormLabel className="text-xs">Low Efficiency Threshold (%)</FormLabel>
+                  <FormControl><Input type="number" {...field} className="h-8" /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
             </CardContent>
           </Card>
           
-          <Card className='border-0'>
-            <CardHeader><CardTitle className="text-primary">WhatsApp Settings</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
+          <Card className='border-0 shadow-none'>
+            <CardHeader className='p-2'><CardTitle className="text-primary text-lg">WhatsApp Settings</CardTitle></CardHeader>
+            <CardContent className="space-y-2 p-2">
               <FormField control={form.control} name="whatsAppNumber" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>WhatsApp Number (with country code)</FormLabel>
-                  <FormControl><Input placeholder="+911234567890" {...field} value={field.value ?? ''} /></FormControl>
+                  <FormLabel className="text-xs">WhatsApp Number (with country code)</FormLabel>
+                  <FormControl><Input placeholder="+911234567890" {...field} value={field.value ?? ''} className="h-8" /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
               <FormField control={form.control} name="messageTemplate" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Message Template</FormLabel>
-                  <FormControl><Textarea placeholder="Use {{variable}} for dynamic content" {...field} value={field.value ?? ''}/></FormControl>
+                  <FormLabel className="text-xs">Message Template</FormLabel>
+                  <FormControl><Textarea placeholder="Use {{variable}} for dynamic content" {...field} value={field.value ?? ''} className="text-xs" rows={3}/></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
             </CardContent>
           </Card>
           
-          <Card className='border-0'>
-            <CardHeader>
-              <CardTitle className="text-primary">Backend & Sync Settings</CardTitle>
-              <CardDescription>Enter your Supabase credentials to enable cloud sync. The Gemini key is used for AI features and should be set as a server secret in your hosting environment.</CardDescription>
+          <Card className='border-0 shadow-none'>
+            <CardHeader className='p-2'>
+              <CardTitle className="text-primary text-lg">Backend & Sync Settings</CardTitle>
+              <CardDescription className='text-xs'>Enter your Supabase credentials to enable cloud sync. The Gemini key is used for AI features and should be set as a server secret in your hosting environment.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-2 p-2">
                <FormField control={form.control} name="supabaseUrl" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Supabase URL</FormLabel>
-                  <FormControl><Input {...field} value={field.value ?? ''} /></FormControl>
+                  <FormLabel className="text-xs">Supabase URL</FormLabel>
+                  <FormControl><Input {...field} value={field.value ?? ''} className="h-8" /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
               <FormField control={form.control} name="supabaseKey" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Supabase API Key (public anon)</FormLabel>
-                  <FormControl><Input type="password" {...field} value={field.value ?? ''} /></FormControl>
+                  <FormLabel className="text-xs">Supabase API Key (public anon)</FormLabel>
+                  <FormControl><Input type="password" {...field} value={field.value ?? ''} className="h-8" /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
                <FormField control={form.control} name="geminiApiKey" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Gemini API Key (Server Secret)</FormLabel>
-                  <FormControl><Input type="password" {...field} value={field.value ?? ''} /></FormControl>
+                  <FormLabel className="text-xs">Gemini API Key (Server Secret)</FormLabel>
+                  <FormControl><Input type="password" {...field} value={field.value ?? ''} className="h-8" /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
               <div>
-                <h4 className='font-medium text-sm mb-2'>Supabase Setup Scripts</h4>
-                <p className='text-sm text-muted-foreground mb-4'>Run these scripts in your Supabase SQL editor to set up the necessary tables and policies for data storage and real-time sync.</p>
-                <FormLabel>1. Records Table & Policies</FormLabel>
-                <Textarea readOnly value={supabaseLoomRecordsScript} className="font-mono text-xs mt-2" rows={20} />
+                <h4 className='font-medium text-sm mb-1'>Supabase Setup Scripts</h4>
+                <p className='text-xs text-muted-foreground mb-2'>Run these scripts in your Supabase SQL editor to set up the necessary tables and policies for data storage and real-time sync.</p>
+                <FormLabel className="text-xs">1. Records Table & Policies</FormLabel>
+                <Textarea readOnly value={supabaseLoomRecordsScript} className="font-mono text-xs mt-1" rows={8} />
               </div>
                <div>
-                <FormLabel>2. Settings Table</FormLabel>
-                <Textarea readOnly value={supabaseSettingsScript} className="font-mono text-xs mt-2" rows={25} />
+                <FormLabel className="text-xs">2. Settings Table</FormLabel>
+                <Textarea readOnly value={supabaseSettingsScript} className="font-mono text-xs mt-1" rows={8} />
               </div>
             </CardContent>
           </Card>
 
-          <Button type="submit" className="w-full bg-primary hover:bg-primary/90">
+          <Button type="submit" className="w-full bg-primary hover:bg-primary/90 h-9">
             <Save className="mr-2 h-4 w-4" /> Save All Settings
           </Button>
         </form>
       </Form>
       
-      <Card className="mt-4 border-destructive">
-          <CardHeader>
-            <CardTitle className="text-destructive flex items-center gap-2"><AlertTriangle />Danger Zone</CardTitle>
+      <Card className="mt-2 border-destructive">
+          <CardHeader className='p-2'>
+            <CardTitle className="text-destructive flex items-center gap-2 text-lg"><AlertTriangle />Danger Zone</CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-sm mb-4">
+          <CardContent className='p-2'>
+            <p className="text-xs mb-2">
                 This action is irreversible. It will delete all records from this browser's local storage and attempt to delete them from Supabase if connected.
             </p>
             <AlertDialog>
                 <AlertDialogTrigger asChild>
-                    <Button variant="destructive"><Trash2 className="mr-2 h-4 w-4"/> Delete All Data</Button>
+                    <Button variant="destructive" size="sm"><Trash2 className="mr-2 h-4 w-4"/> Delete All Data</Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                     <AlertDialogHeader>
@@ -245,5 +245,3 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.settings;
     </div>
   );
 }
-
-    
