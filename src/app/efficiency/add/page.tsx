@@ -91,12 +91,6 @@ export default function AddEfficiencyRecordPage() {
 
   const processScanResult = (result: Awaited<ReturnType<typeof scanLoomDisplay>>) => {
     const valuesToSet: Partial<z.infer<typeof formSchema>> = {};
-    if (result.date) {
-        const [day, month, year] = result.date.split('/');
-        if(day && month && year) {
-            valuesToSet.date = new Date(`${year}-${month}-${day}`);
-        }
-    }
     if (result.time) valuesToSet.time = result.time;
     if (result.shift) {
         if (result.shift.toUpperCase() === 'A') valuesToSet.shift = 'Day';
