@@ -62,6 +62,8 @@ export default function EfficiencyPage() {
   const dayShiftRecords = filteredRecords.filter(r => r.shift === 'Day');
   const nightShiftRecords = filteredRecords.filter(r => r.shift === 'Night');
 
+  const cellPadding = "p-1";
+
   const renderRecordsTable = (title: string, data: CalculatedLoomRecord[]) => (
     <Card>
       <CardHeader className="p-2">
@@ -72,37 +74,33 @@ export default function EfficiencyPage() {
           <Table className="text-xs">
             <TableHeader>
               <TableRow>
-                <TableHead>Shift</TableHead>
-                <TableHead>Time</TableHead>
-                <TableHead>M/C</TableHead>
-                <TableHead>Stops</TableHead>
-                <TableHead>Weft</TableHead>
-                <TableHead>Total</TableHead>
-                <TableHead>Run</TableHead>
-                <TableHead>Eff(%)</TableHead>
-                <TableHead>H/R</TableHead>
-                <TableHead>Diff</TableHead>
-                <TableHead>Act</TableHead>
+                <TableHead className={cellPadding}>Shift</TableHead>
+                <TableHead className={cellPadding}>Time</TableHead>
+                <TableHead className={cellPadding}>M/C</TableHead>
+                <TableHead className={cellPadding}>Stops</TableHead>
+                <TableHead className={cellPadding}>Weft</TableHead>
+                <TableHead className={cellPadding}>Total</TableHead>
+                <TableHead className={cellPadding}>Run</TableHead>
+                <TableHead className={cellPadding}>Eff(%)</TableHead>
+                <TableHead className={cellPadding}>H/R</TableHead>
+                <TableHead className={cellPadding}>Diff</TableHead>
+                <TableHead className={cellPadding}>Act</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {data.map(record => (
-                <TableRow key={record.id} className={cn(
-                  'font-bold',
-                  record.shift === 'Day' && 'text-blue-600',
-                  record.shift === 'Night' && 'text-red-600'
-                )}>
-                  <TableCell>{record.shift}</TableCell>
-                  <TableCell>{record.time}</TableCell>
-                  <TableCell>{record.machineNo}</TableCell>
-                  <TableCell>{record.stops}</TableCell>
-                  <TableCell>{record.weftMeter.toFixed(1)}</TableCell>
-                  <TableCell>{record.total}</TableCell>
-                  <TableCell>{record.run}</TableCell>
-                  <TableCell>{record.efficiency.toFixed(2)}</TableCell>
-                  <TableCell>{record.hr.toFixed(2)}</TableCell>
-                  <TableCell>{record.diff}</TableCell>
-                  <TableCell>
+                <TableRow key={record.id} className="font-bold">
+                  <TableCell className={cn(cellPadding, record.shift === 'Day' ? 'text-blue-600' : 'text-red-600')}>{record.shift}</TableCell>
+                  <TableCell className={cn(cellPadding, 'text-gray-700')}>{record.time}</TableCell>
+                  <TableCell className={cn(cellPadding, 'text-purple-600')}>{record.machineNo}</TableCell>
+                  <TableCell className={cn(cellPadding, 'text-orange-600')}>{record.stops}</TableCell>
+                  <TableCell className={cn(cellPadding, 'text-teal-600')}>{record.weftMeter.toFixed(1)}</TableCell>
+                  <TableCell className={cn(cellPadding, 'text-gray-700')}>{record.total}</TableCell>
+                  <TableCell className={cn(cellPadding, 'text-gray-700')}>{record.run}</TableCell>
+                  <TableCell className={cn(cellPadding, 'text-green-600')}>{record.efficiency.toFixed(2)}</TableCell>
+                  <TableCell className={cn(cellPadding, 'text-indigo-600')}>{record.hr.toFixed(2)}</TableCell>
+                  <TableCell className={cn(cellPadding, 'text-pink-600')}>{record.diff}</TableCell>
+                  <TableCell className={cellPadding}>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-6 w-6">
@@ -184,5 +182,3 @@ export default function EfficiencyPage() {
     </div>
   );
 }
-
-    
