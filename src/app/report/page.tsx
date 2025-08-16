@@ -167,19 +167,19 @@ export default function ReportPage() {
             <h4 className="font-semibold text-center text-sm mb-1 text-primary">{shift} Shift</h4>
             <Table className="text-[10px] print-table">
                 <TableHeader>
-                    <TableRow>
+                    <TableRow className="no-print">
                         {tableHeaders.map(({ key, label }) => (
-                            <TableHead key={key} className={cn(cellPadding, "no-print")}>
+                            <TableHead key={key} className={cn(cellPadding)}>
                                 <Button variant="ghost" onClick={() => requestSort(key)} className="p-0 h-auto text-[10px] font-bold hover:bg-transparent">
                                     {label} {getSortIcon(key)}
                                 </Button>
                             </TableHead>
                         ))}
-                         <TableRow className='print-only'>
-                            {tableHeaders.map(({ key, label }) => (
-                                <TableHead key={`${key}-print`} className={cn(cellPadding, 'font-bold')}>{label}</TableHead>
-                            ))}
-                        </TableRow>
+                    </TableRow>
+                     <TableRow className='print-only'>
+                        {tableHeaders.map(({ key, label }) => (
+                            <TableHead key={`${key}-print`} className={cn(cellPadding, 'font-bold')}>{label}</TableHead>
+                        ))}
                     </TableRow>
                 </TableHeader>
                 <TableBody>
