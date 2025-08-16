@@ -164,7 +164,7 @@ export default function ReportPage() {
       { key: 'lossPrd', label: 'LossPrd', className: 'text-red-700' }
   ];
   
-  const cellPadding = "p-1";
+  const cellPadding = "p-0.5";
 
 
   const renderTableForShift = (data: CalculatedLoomRecord[], shift: 'Day' | 'Night') => {
@@ -199,7 +199,7 @@ export default function ReportPage() {
                     {shiftData.map(r => (
                         <TableRow key={r.id}>
                             <TableCell className={cn(cellPadding, 'text-gray-700')}>{format(parseISO(r.date), 'dd/MM')}</TableCell>
-                            <TableCell className={cn(cellPadding, 'text-gray-700')}>{r.time}</TableCell>
+                            <TableCell className={cn(cellPadding, 'text-gray-700')}>{r.time.substring(0,5)}</TableCell>
                             <TableCell className={cn(cellPadding, 'text-purple-600')}>{r.machineNo}</TableCell>
                             <TableCell className={cn(cellPadding, 'text-orange-600')}>{r.stops}</TableCell>
                             <TableCell className={cn(cellPadding, 'text-teal-600')}>{r.weftMeter.toFixed(1)}</TableCell>
@@ -227,7 +227,7 @@ export default function ReportPage() {
   return (
     <div className="space-y-2">
       <Card className="no-print shadow-none border-0 m-0">
-        <CardContent className="grid grid-cols-2 gap-2 p-1">
+        <CardContent className="grid grid-cols-2 gap-1 p-1">
           <div>
             <Popover>
               <PopoverTrigger asChild>
@@ -269,7 +269,7 @@ export default function ReportPage() {
       </Card>
 
       <div ref={componentRef} className="print-container">
-        <Card className="shadow-none border-0">
+        <Card className="shadow-none border-0 m-0 p-0">
           <CardHeader className='p-1'>
             <CardTitle className="text-center text-lg font-bold text-primary">Laxmi Shree Efficiency Report</CardTitle>
             <p className="text-center text-xs text-muted-foreground">
@@ -306,5 +306,3 @@ export default function ReportPage() {
     </div>
   );
 }
-
-    

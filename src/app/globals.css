@@ -102,10 +102,10 @@ body {
   }
   .print-table {
     width: 100%;
-    font-size: 8px; /* Even smaller font for print */
+    font-size: 10px; 
   }
   .print-table th, .print-table td {
-    padding: 2px 4px;
+    padding: 2px;
   }
   .print-only {
     display: table-row !important;
@@ -125,9 +125,9 @@ body {
     }
 }
 .pdf-generation .print-table {
-    font-size: 8px; /* Further reduced font size for PDF */
+    font-size: 10px; 
 }
 .pdf-generation .print-table th,
 .pdf-generation .print-table td {
-    padding: 2px; /* Further reduced padding for PDF */
+    padding: 2px;
 }

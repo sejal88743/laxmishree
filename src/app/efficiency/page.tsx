@@ -97,7 +97,7 @@ export default function EfficiencyPage() {
   }
 
 
-  const cellPadding = "p-1";
+  const cellPadding = "p-0.5";
 
   const renderRecordsTable = (title: string, data: CalculatedLoomRecord[]) => {
     
@@ -141,7 +141,7 @@ export default function EfficiencyPage() {
             <TableBody>
               {data.map(record => (
                 <TableRow key={record.id}>
-                  <TableCell className={cn(cellPadding, 'text-gray-700')}>{record.time}</TableCell>
+                  <TableCell className={cn(cellPadding, 'text-gray-700')}>{record.time.substring(0,5)}</TableCell>
                   <TableCell className={cn(cellPadding, 'text-purple-600')}>{record.machineNo}</TableCell>
                   <TableCell className={cn(cellPadding, 'text-orange-600')}>{record.stops}</TableCell>
                   <TableCell className={cn(cellPadding, 'text-teal-600')}>{record.weftMeter.toFixed(1)}</TableCell>
@@ -208,7 +208,7 @@ export default function EfficiencyPage() {
 
   return (
     <div className="space-y-2">
-      <div className="flex justify-between items-center gap-2">
+      <div className="flex justify-between items-center gap-2 px-1">
         <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
           <PopoverTrigger asChild>
             <Button variant="outline" className="w-full justify-start text-left font-normal bg-card">
@@ -243,5 +243,3 @@ export default function EfficiencyPage() {
     </div>
   );
 }
-
-    
