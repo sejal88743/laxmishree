@@ -187,9 +187,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         await processPending(supabaseClient);
         
         setSupabaseStatus('connected');
-        if (initialDataFetched.current) {
-            toast({ title: "Cloud Connected", description: "Data is live and syncing." });
-        }
+        // if (initialDataFetched.current) {
+        //     toast({ title: "Cloud Connected", description: "Data is live and syncing." });
+        // }
         
         settingsChannel = supabaseClient.channel('settings-channel')
           .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'settings', filter: `id=eq.${GLOBAL_SETTINGS_ID}` }, (payload) => {
@@ -238,7 +238,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       } catch (error) {
           console.error('Supabase connection or initial fetch failed:', error);
           setSupabaseStatus('disconnected');
-          toast({ title: 'Connection Failed', description: 'Could not connect to Supabase.', variant: 'destructive' });
+          // toast({ title: 'Connection Failed', description: 'Could not connect to Supabase.', variant: 'destructive' });
       }
     };
 
