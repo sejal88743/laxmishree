@@ -30,14 +30,20 @@ export default function ReportPage() {
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null);
 
   const componentRef = useRef<HTMLDivElement>(null);
+
   const handlePrint = useReactToPrint({
     content: () => componentRef.current,
-     pageStyle: `
+    pageStyle: `
       @page {
         size: A4;
         margin: 0.5in;
       }
-    `
+    `,
+    trigger: () => (
+        <Button className="w-full bg-accent hover:bg-accent/90">
+            <Printer className="mr-2 h-4 w-4" /> Print Report
+        </Button>
+    ),
   });
 
   const filteredRecords = useMemo(() => {
@@ -216,11 +222,7 @@ export default function ReportPage() {
             </Select>
           </div>
           <div className="flex items-end">
-            <div onClick={handlePrint} className="w-full">
-                <Button className="w-full bg-accent hover:bg-accent/90">
-                <Printer className="mr-2 h-4 w-4" /> Print Report
-                </Button>
-            </div>
+            {handlePrint}
           </div>
         </CardContent>
       </Card>
