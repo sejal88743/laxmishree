@@ -9,7 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter as TFoot } from '@/components/ui/table';
-import { Calendar as CalendarIcon, Download, ArrowUpDown, Loader2 } from 'lucide-react';
+import { Calendar as CalendarIcon, Download, Loader2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 import { useAppState } from '@/hooks/use-app-state';
@@ -42,7 +42,7 @@ export default function ReportPage() {
     reportElement.classList.add('pdf-generation');
 
     const canvas = await html2canvas(reportElement, {
-        scale: 2, // Higher scale for better quality
+        scale: 2, 
         useCORS: true,
         logging: false,
     });
@@ -62,21 +62,17 @@ export default function ReportPage() {
     const canvasWidth = canvas.width;
     const canvasHeight = canvas.height;
     
-    // Calculate the aspect ratio
     const ratio = canvasWidth / canvasHeight;
     let imgHeight = pdfWidth / ratio;
     
-    // If the content is taller than the page, it needs to be split
     let heightLeft = imgHeight;
     let position = 0;
 
-    // Add first page
     pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
     heightLeft -= pdfHeight;
 
-    // Add new pages if content is longer than one page
     while (heightLeft > 0) {
-      position = heightLeft - imgHeight; // Set top of image for the new page
+      position = heightLeft - imgHeight; 
       pdf.addPage();
       pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
       heightLeft -= pdfHeight;
@@ -150,9 +146,9 @@ export default function ReportPage() {
   
   const getSortIcon = (key: SortKey) => {
     if (!sortConfig || sortConfig.key !== key) {
-        return <ArrowUpDown className="ml-2 h-3 w-3" />;
+        return null;
     }
-    return sortConfig.direction === 'asc' ? '▲' : '▼';
+    return sortConfig.direction === 'asc' ? <span className="ml-1 text-xs">▲</span> : <span className="ml-1 text-xs">▼</span>;
   }
 
   const tableHeaders: { key: SortKey; label: string; className: string }[] = [
@@ -229,8 +225,8 @@ export default function ReportPage() {
 
   return (
     <div className="p-1 space-y-2">
-      <Card className="no-print shadow-none border-0">
-        <CardContent className="grid grid-cols-2 lg:grid-cols-4 gap-2 p-1">
+      <Card className="no-print shadow-none border-0 m-0">
+        <CardContent className="grid grid-cols-2 gap-2 p-1">
           <div>
             <Popover>
               <PopoverTrigger asChild>
@@ -262,7 +258,7 @@ export default function ReportPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="flex items-end">
+          <div>
             <Button onClick={handleDownloadPdf} className="w-full bg-accent hover:bg-accent/90 h-9" disabled={isGenerating}>
               {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
               {isGenerating ? 'Generating...' : 'Download PDF'}

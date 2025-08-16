@@ -10,7 +10,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter as TFoot } from '@/components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Calendar as CalendarIcon, PlusCircle, MoreVertical, Edit, Trash2, ArrowUpDown } from 'lucide-react';
+import { Calendar as CalendarIcon, PlusCircle, MoreVertical, Edit, Trash2 } from 'lucide-react';
 import { format, parse, isValid } from 'date-fns';
 import { useAppState } from '@/hooks/use-app-state';
 import { processRecord } from '@/lib/calculations';
@@ -91,9 +91,9 @@ export default function EfficiencyPage() {
 
   const getSortIcon = (key: SortKey) => {
     if (!sortConfig || sortConfig.key !== key) {
-        return <ArrowUpDown className="ml-2 h-3 w-3" />;
+        return null;
     }
-    return sortConfig.direction === 'asc' ? '▲' : '▼';
+    return sortConfig.direction === 'asc' ? <span className="ml-1 text-xs">▲</span> : <span className="ml-1 text-xs">▼</span>;
   }
 
 
