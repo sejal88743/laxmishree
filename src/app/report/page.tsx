@@ -173,13 +173,13 @@ export default function ReportPage() {
 
   const renderTableForShift = (data: CalculatedLoomRecord[], shift: 'Day' | 'Night') => {
     const shiftData = data.filter(r => r.shift === shift);
-    if(shiftData.length === 0) return <div className="w-full p-1 print-card"><Card className='h-full'><CardContent className='flex items-center justify-center h-full text-muted-foreground'>No records for {shift} shift</CardContent></Card></div>;
+    if(shiftData.length === 0) return null;
 
     const totalWeft = shiftData.reduce((sum, r) => sum + r.weftMeter, 0);
     const totalLossPrd = shiftData.reduce((sum, r) => sum + r.lossPrd, 0);
     
     return (
-        <div className="w-full p-1 print-card">
+        <div className="w-full print-card">
             <h4 className="font-semibold text-center text-sm mb-1 text-primary">{shift} Shift</h4>
             <Table className="text-[10px] print-table">
                 <TableHeader>
@@ -228,17 +228,13 @@ export default function ReportPage() {
   }
 
   return (
-    <div className="p-2 space-y-4">
-      <Card className="no-print">
-        <CardHeader>
-          <CardTitle className="text-primary">Generate Report</CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="p-1 space-y-2">
+      <Card className="no-print shadow-none border-0">
+        <CardContent className="grid grid-cols-2 lg:grid-cols-4 gap-2 p-1">
           <div>
-            <label className="text-sm font-medium">Date Range</label>
             <Popover>
               <PopoverTrigger asChild>
-                <Button id="date" variant="outline" className="w-full justify-start text-left font-normal bg-card">
+                <Button id="date" variant="outline" className="w-full justify-start text-left font-normal bg-card h-9">
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {dateRange?.from ? (dateRange.to ? `${format(dateRange.from, 'dd/MM/yy')} - ${format(dateRange.to, 'dd/MM/yy')}` : format(dateRange.from, 'dd/MM/yy')) : <span>Pick a date</span>}
                 </Button>
@@ -249,18 +245,16 @@ export default function ReportPage() {
             </Popover>
           </div>
           <div>
-            <label className="text-sm font-medium">Machine</label>
             <Select value={machineFilter} onValueChange={setMachineFilter}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {machineOptions.map(opt => <SelectItem key={opt} value={opt}>{opt === 'all' ? 'All Machines' : `Machine ${opt}`}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
           <div>
-            <label className="text-sm font-medium">Shift</label>
             <Select value={shiftFilter} onValueChange={(val: 'all'|'Day'|'Night') => setShiftFilter(val)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Both Shifts</SelectItem>
                 <SelectItem value="Day">Day</SelectItem>
@@ -269,30 +263,30 @@ export default function ReportPage() {
             </Select>
           </div>
           <div className="flex items-end">
-            <Button onClick={handleDownloadPdf} className="w-full bg-accent hover:bg-accent/90" disabled={isGenerating}>
+            <Button onClick={handleDownloadPdf} className="w-full bg-accent hover:bg-accent/90 h-9" disabled={isGenerating}>
               {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-              {isGenerating ? 'Generating PDF...' : 'Download PDF'}
+              {isGenerating ? 'Generating...' : 'Download PDF'}
             </Button>
           </div>
         </CardContent>
       </Card>
 
       <div ref={componentRef} className="print-container">
-        <Card>
-          <CardHeader className='p-2'>
-            <CardTitle className="text-center text-xl font-bold text-primary">Laxmi Shree Efficiency Report</CardTitle>
-            <p className="text-center text-sm text-muted-foreground">
+        <Card className="shadow-none border-0">
+          <CardHeader className='p-1'>
+            <CardTitle className="text-center text-lg font-bold text-primary">Laxmi Shree Efficiency Report</CardTitle>
+            <p className="text-center text-xs text-muted-foreground">
               {dateRange?.from && format(dateRange.from, 'dd/MM/yyyy')} - {dateRange?.to && format(dateRange.to, 'dd/MM/yyyy')}
             </p>
-             <div className="text-center text-sm text-muted-foreground">
+             <div className="text-center text-xs text-muted-foreground">
               {machineFilter !== 'all' && `Machine: ${machineFilter}`} {shiftFilter !== 'all' && `Shift: ${shiftFilter}`}
              </div>
           </CardHeader>
-          <CardContent className='p-2'>
+          <CardContent className='p-0'>
             {groupedRecords.map(([date, dateRecords]) => (
-              <div key={date} className="mb-4 p-2 border rounded-md">
-                <h3 className="text-lg text-center font-bold my-1 p-1 bg-muted rounded-md">{format(parseISO(date), 'EEEE, dd MMMM yyyy')}</h3>
-                <div className="flex -m-1 print-shifts-container">
+              <div key={date} className="mb-2">
+                <h3 className="text-md text-center font-bold p-1 bg-muted rounded-sm">{format(parseISO(date), 'EEEE, dd MMMM yyyy')}</h3>
+                <div className="flex flex-col print-shifts-container">
                     {renderTableForShift(dateRecords, 'Day')}
                     {renderTableForShift(dateRecords, 'Night')}
                 </div>
@@ -300,14 +294,16 @@ export default function ReportPage() {
             ))}
              {groupedRecords.length === 0 && <p className="text-center text-muted-foreground py-10">No records found for the selected filters.</p>}
           </CardContent>
-          <CardFooter className="flex justify-end flex-wrap gap-4 p-2">
-              <div className="text-lg font-bold text-primary p-2 rounded-md bg-primary/10">
-                  Grand Total Loss Prd: {grandTotalLossPrd.toFixed(2)}
-              </div>
-              <div className="text-lg font-bold text-primary p-2 rounded-md bg-primary/10">
-                  Grand Total Weft Meter: {grandTotalWeft.toFixed(2)}
-              </div>
-          </CardFooter>
+          {filteredRecords.length > 0 && (
+            <CardFooter className="flex justify-end flex-wrap gap-2 p-1">
+                <div className="text-sm font-bold text-primary p-1 rounded-md bg-primary/10">
+                    Grand Total Loss Prd: {grandTotalLossPrd.toFixed(2)}
+                </div>
+                <div className="text-sm font-bold text-primary p-1 rounded-md bg-primary/10">
+                    Grand Total Weft Meter: {grandTotalWeft.toFixed(2)}
+                </div>
+            </CardFooter>
+          )}
         </Card>
       </div>
     </div>
