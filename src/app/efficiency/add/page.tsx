@@ -1,21 +1,23 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useAppState } from '@/hooks/use-app-state';
 import { scanLoomDisplay } from '@/ai/flows/scan-loom-display';
+import { processRecord } from '@/lib/calculations';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from '@/hooks/use-toast';
 import { Calendar as CalendarIcon, Upload, Camera, Save, Loader2, ArrowLeft } from 'lucide-react';
 import { format } from 'date-fns';
@@ -35,7 +37,7 @@ const formSchema = z.object({
 
 export default function AddEfficiencyRecordPage() {
   const router = useRouter();
-  const { addRecord, settings } = useAppState();
+  const { records, addRecord, settings } = useAppState();
   const [isScanning, setIsScanning] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
@@ -49,12 +51,26 @@ export default function AddEfficiencyRecordPage() {
     defaultValues: {
       date: new Date(),
       time: format(new Date(), 'HH:mm'),
+      shift: 'Day',
       stops: 0,
       weftMeter: 0,
       total: '00:00:00',
       run: '00:00:00',
     },
   });
+
+  const watchedDate = useWatch({ control: form.control, name: 'date' });
+  const watchedShift = useWatch({ control: form.control, name: 'shift' });
+
+  const recentRecords = useMemo(() => {
+    if (!watchedDate || !watchedShift) return [];
+    const dateString = format(watchedDate, 'yyyy-MM-dd');
+    return records
+      .filter(r => r.date === dateString && r.shift === watchedShift)
+      .map(processRecord)
+      .sort((a, b) => b.time.localeCompare(a.time))
+      .slice(0, 5);
+  }, [records, watchedDate, watchedShift]);
 
   useEffect(() => {
     if (!showCamera) return;
@@ -102,7 +118,10 @@ export default function AddEfficiencyRecordPage() {
     if (result.total) valuesToSet.total = result.total;
     if (result.run) valuesToSet.run = result.run;
     
-    form.reset({ ...form.getValues(), ...valuesToSet });
+    // Keep the manually selected date
+    const currentValues = form.getValues();
+    form.reset({ ...currentValues, ...valuesToSet });
+
 
     toast({ title: 'Scan Complete', description: 'Form has been pre-filled.' });
   }
@@ -161,7 +180,7 @@ export default function AddEfficiencyRecordPage() {
     addRecord(record);
     toast({ title: 'Record Saved!', description: `Record for Machine ${values.machineNo} has been added.` });
     
-    const keptValues = { date: values.date, machineNo: values.machineNo, shift: values.shift };
+    const keptValues = { date: values.date, machineNo: '', shift: values.shift };
     form.reset({
         ...form.formState.defaultValues,
         ...keptValues,
@@ -171,6 +190,8 @@ export default function AddEfficiencyRecordPage() {
         total: '00:00:00',
         run: '00:00:00',
     });
+    // Set focus back to machine number for quick entry
+    form.setFocus('machineNo');
   };
 
   const machineOptions = Array.from({ length: settings.totalMachines || 0 }, (_, i) => (i + 1).toString());
@@ -216,14 +237,14 @@ export default function AddEfficiencyRecordPage() {
 
 
   return (
-    <div className="p-2">
+    <div className="p-2 space-y-4">
       <Card className="m-0 shadow-lg">
         <CardHeader className="flex flex-row items-center justify-between">
           <div className='flex items-center gap-2'>
             <Button variant="ghost" size="icon" onClick={() => router.back()}>
                 <ArrowLeft />
             </Button>
-            
+            <CardTitle className='text-primary text-xl'>Add Record</CardTitle>
           </div>
           <div className="flex gap-2">
             <input type="file" accept="image/*" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
@@ -369,6 +390,40 @@ export default function AddEfficiencyRecordPage() {
           </Form>
         </CardContent>
       </Card>
+
+       {recentRecords.length > 0 && (
+        <Card className="mt-4 shadow-lg">
+          <CardHeader>
+            <CardTitle className="text-primary text-lg">Recent Entries for {format(watchedDate, 'dd/MM/yy')} - {watchedShift} Shift</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+             <div className="overflow-x-auto">
+              <Table className="text-xs">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Time</TableHead>
+                    <TableHead>M/C</TableHead>
+                    <TableHead>Stops</TableHead>
+                    <TableHead>Weft(m)</TableHead>
+                    <TableHead>Eff(%)</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {recentRecords.map(record => (
+                    <TableRow key={record.id} className="font-bold">
+                      <TableCell>{record.time}</TableCell>
+                      <TableCell>{record.machineNo}</TableCell>
+                      <TableCell>{record.stops}</TableCell>
+                      <TableCell>{record.weftMeter.toFixed(1)}</TableCell>
+                      <TableCell>{record.efficiency.toFixed(2)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
