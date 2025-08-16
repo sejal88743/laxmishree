@@ -33,18 +33,27 @@ export const calculateHr = (weftMeter: number, runSeconds: number): number => {
   return weftMeter / runHours;
 };
 
+export const calculateLossPrd = (downtimeSeconds: number, hr: number): number => {
+    if (downtimeSeconds <= 0 || hr <= 0) return 0;
+    const downtimeHours = downtimeSeconds / 3600;
+    return downtimeHours * hr;
+}
+
 export const processRecord = (record: LoomRecord): CalculatedLoomRecord => {
   const runSeconds = timeToSeconds(record.run);
   const totalSeconds = timeToSeconds(record.total);
+  const downtimeSeconds = totalSeconds - runSeconds;
 
   const efficiency = calculateEfficiency(runSeconds, totalSeconds);
   const hr = calculateHr(record.weftMeter, runSeconds);
-  const diff = secondsToTime(totalSeconds - runSeconds);
+  const diff = secondsToTime(downtimeSeconds);
+  const lossPrd = calculateLossPrd(downtimeSeconds, hr);
 
   return {
     ...record,
     efficiency,
     hr,
     diff,
+    lossPrd,
   };
 };

@@ -15,6 +15,7 @@ export interface CalculatedLoomRecord extends LoomRecord {
   efficiency: number;
   hr: number; // Weft Meter / Run Time in hours
   diff: string; // Total - Run
+  lossPrd: number; // diff in hours * hr
 }
 
 export interface AppSettings {
