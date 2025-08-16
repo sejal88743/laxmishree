@@ -39,11 +39,6 @@ export default function ReportPage() {
         margin: 0.5in;
       }
     `,
-    trigger: () => (
-        <Button className="w-full bg-accent hover:bg-accent/90">
-            <Printer className="mr-2 h-4 w-4" /> Print Report
-        </Button>
-    ),
   });
 
   const filteredRecords = useMemo(() => {
@@ -222,7 +217,9 @@ export default function ReportPage() {
             </Select>
           </div>
           <div className="flex items-end">
-            {handlePrint}
+             <Button onClick={handlePrint} className="w-full bg-accent hover:bg-accent/90">
+                <Printer className="mr-2 h-4 w-4" /> Print Report
+             </Button>
           </div>
         </CardContent>
       </Card>
