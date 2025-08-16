@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { createContext, useState, useEffect, ReactNode, useCallback, useRef, useMemo } from 'react';
+import React, { createContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 import { createClient, SupabaseClient, RealtimeChannel } from '@supabase/supabase-js';
 import type { LoomRecord, AppSettings } from '@/lib/types';
 import { DEFAULT_SETTINGS } from '@/lib/types';
@@ -42,15 +42,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [supabaseClient, setSupabaseClient] = useState<SupabaseClient | null>(null);
   const [supabaseStatus, setSupabaseStatus] = useState<SupabaseStatus>('disconnected');
   
-  const recordsChannel = useRef<RealtimeChannel | null>(null);
-  const settingsChannel = useRef<RealtimeChannel | null>(null);
-  
   const isSyncing = useRef(false);
   const initialDataFetched = useRef(false);
   const activeSyncIds = useRef(new Set<string>());
 
-
-  // 1. Load initial data from localStorage on mount
+  // Load initial data from localStorage on mount
   useEffect(() => {
     const localRecords = getFromLocalStorage<LoomRecord[]>(LOCAL_RECORDS_STORAGE_KEY, []);
     const localSettings = getFromLocalStorage<AppSettings>(LOCAL_SETTINGS_STORAGE_KEY, DEFAULT_SETTINGS);
@@ -62,19 +58,36 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setIsInitialized(true);
   }, []);
   
-  // 2. Save records and pending sync to localStorage when they change
+  // Save to localStorage when data changes
   useEffect(() => {
     if (isInitialized) {
       saveToLocalStorage(LOCAL_RECORDS_STORAGE_KEY, records);
       saveToLocalStorage(PENDING_SYNC_STORAGE_KEY, pendingSync);
+      saveToLocalStorage(LOCAL_SETTINGS_STORAGE_KEY, settings);
     }
-  }, [records, pendingSync, isInitialized]);
+  }, [records, pendingSync, settings, isInitialized]);
+  
+  // Manage Supabase client based on settings
+  useEffect(() => {
+    if (!isInitialized) return;
+    
+    const { supabaseUrl, supabaseKey } = settings;
+
+    if (supabaseUrl && supabaseKey) {
+      const client = createClient(supabaseUrl, supabaseKey);
+      setSupabaseClient(client);
+      initialDataFetched.current = false;
+    } else {
+      setSupabaseClient(null);
+    }
+  }, [isInitialized, settings.supabaseUrl, settings.supabaseKey]);
 
   const processPending = useCallback(async (client: SupabaseClient) => {
     if (isSyncing.current || pendingSync.length === 0) return;
     isSyncing.current = true;
 
-    let remainingOps = [...pendingSync];
+    const remainingOps = [...pendingSync];
+    const successfulOps: PendingSyncOperation[] = [];
 
     for (const op of pendingSync) {
         const opId = (op as any).record?.id || op.id;
@@ -101,8 +114,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 const { error } = await client.from('loom_records').delete().eq('id', op.id);
                 if (error) throw error;
             }
-            // Success, remove from remainingOps
-            remainingOps = remainingOps.filter(r => r !== op);
+            successfulOps.push(op);
         } catch (error) {
             console.error('Failed to sync pending operation:', op.type, (op as any).record?.id || op.id, error);
         } finally {
@@ -110,45 +122,23 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         }
     }
     
-    if (pendingSync.length !== remainingOps.length) {
-        setPendingSync(remainingOps);
+    if (successfulOps.length > 0) {
+      setPendingSync(currentPending => currentPending.filter(op => !successfulOps.includes(op)));
     }
     
     isSyncing.current = false;
     
-    if (remainingOps.length > 0 && pendingSync.length !== remainingOps.length) {
-      toast({ title: 'Sync Incomplete', description: `${remainingOps.length} changes could not be synced. Will retry.`, variant: 'destructive' });
-    }
-    
   }, [pendingSync]);
 
-
-  // 4. Manage Supabase client and connection based on settings
+  // Manage subscriptions and data fetching
   useEffect(() => {
-    if (!isInitialized) return;
-    
-    const { supabaseUrl, supabaseKey } = settings;
-
-    if (supabaseUrl && supabaseKey && supabaseUrl !== supabaseClient?.supabaseUrl) {
-        const client = createClient(supabaseUrl, supabaseKey);
-        setSupabaseClient(client);
-        initialDataFetched.current = false;
-    } else if (!supabaseUrl || !supabaseKey) {
-        if(supabaseClient) {
-            supabaseClient.removeAllChannels();
-            recordsChannel.current = null;
-            settingsChannel.current = null;
-            setSupabaseClient(null);
-            setSupabaseStatus('disconnected');
-        }
+    if (!supabaseClient) {
+      setSupabaseStatus('disconnected');
+      return;
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isInitialized, settings.supabaseUrl, settings.supabaseKey]);
 
-
-  // 5. Manage subscriptions and data fetching
-  useEffect(() => {
-    if (!supabaseClient) return;
+    let recordsChannel: RealtimeChannel | null = null;
+    let settingsChannel: RealtimeChannel | null = null;
 
     const setupSubscriptions = async () => {
       setSupabaseStatus('reconnecting');
@@ -165,17 +155,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           if (settingsError && settingsError.code !== 'PGRST116') throw settingsError;
 
           if (initialSettings) {
-            const transformedSettings: Partial<AppSettings> = {
+            setSettings(prev => ({
+              ...prev,
               totalMachines: initialSettings.total_machines,
               lowEfficiencyThreshold: initialSettings.low_efficiency_threshold,
               whatsAppNumber: initialSettings.whatsapp_number,
               messageTemplate: initialSettings.message_template,
-            };
-             setSettings(prev => {
-              const merged = { ...prev, ...transformedSettings };
-              saveToLocalStorage(LOCAL_SETTINGS_STORAGE_KEY, merged);
-              return merged;
-            });
+            }));
           }
 
           // Fetch records
@@ -192,36 +178,32 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             const remoteRecordsMap = new Map((transformedRecords || []).map(r => [r.id, r]));
             const localRecordsMap = new Map(prevLocalRecords.map(r => [r.id, r]));
             const merged = Array.from(new Map([...localRecordsMap, ...remoteRecordsMap]).values());
-            saveToLocalStorage(LOCAL_RECORDS_STORAGE_KEY, merged);
             return merged;
           });
 
           initialDataFetched.current = true;
         }
 
-        // After initial fetch, process any pending offline changes
         await processPending(supabaseClient);
         
         setSupabaseStatus('connected');
-        toast({ title: "Cloud Connected", description: "Data is live and syncing." });
+        if (initialDataFetched.current) {
+            toast({ title: "Cloud Connected", description: "Data is live and syncing." });
+        }
         
-        settingsChannel.current = supabaseClient.channel('settings-channel')
+        settingsChannel = supabaseClient.channel('settings-channel')
           .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'settings', filter: `id=eq.${GLOBAL_SETTINGS_ID}` }, (payload) => {
             const newSettings = payload.new as any;
-            const transformedSettings: Partial<AppSettings> = {
+            setSettings(prev => ({
+                ...prev,
                 totalMachines: newSettings.total_machines,
                 lowEfficiencyThreshold: newSettings.low_efficiency_threshold,
                 whatsAppNumber: newSettings.whatsapp_number,
                 messageTemplate: newSettings.message_template,
-            };
-            setSettings(prev => {
-              const updated = { ...prev, ...transformedSettings };
-              saveToLocalStorage(LOCAL_SETTINGS_STORAGE_KEY, updated);
-              return updated;
-            });
+            }));
           }).subscribe();
         
-        recordsChannel.current = supabaseClient.channel('loom-records-channel')
+        recordsChannel = supabaseClient.channel('loom-records-channel')
           .on('postgres_changes', { event: '*', schema: 'public', table: 'loom_records' }, (payload) => {
             const recordId = (payload.new as LoomRecord)?.id || (payload.old as any)?.id;
             if (activeSyncIds.current.has(recordId)) return;
@@ -262,30 +244,28 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     setupSubscriptions();
     
-    // Set up a poller to retry pending sync
-    const interval = setInterval(() => {
-        if(supabaseStatus === 'connected' && pendingSync.length > 0) {
-            processPending(supabaseClient);
-        }
-    }, 15000); // Retry every 15 seconds
-
     return () => {
-        clearInterval(interval);
-        if (supabaseClient) {
-            supabaseClient.removeAllChannels();
-            recordsChannel.current = null;
-            settingsChannel.current = null;
-        }
+        if (recordsChannel) supabaseClient.removeChannel(recordsChannel);
+        if (settingsChannel) supabaseClient.removeChannel(settingsChannel);
     };
-  }, [supabaseClient, processPending, pendingSync.length, supabaseStatus]);
+  }, [supabaseClient, processPending]);
   
+  useEffect(() => {
+    if (!supabaseClient || supabaseStatus !== 'connected' || pendingSync.length === 0) return;
+    
+    const interval = setInterval(() => {
+        processPending(supabaseClient);
+    }, 15000); 
 
+    return () => clearInterval(interval);
+  }, [supabaseClient, supabaseStatus, pendingSync, processPending]);
+  
   const syncOrQueue = useCallback((op: PendingSyncOperation) => {
     setPendingSync(prev => {
         let newPending = [...prev];
         const opId = (op as any).record?.id || op.id;
 
-        // For updates and deletes, remove any previous operations for the same record
+        // Remove any previous operations for the same record to avoid conflicts
         newPending = newPending.filter(p => (((p as any).record?.id || p.id) !== opId));
 
         return [...newPending, op];
@@ -311,7 +291,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const updateSettings = useCallback(async (newSettings: Partial<AppSettings>) => {
     const updatedSettings = { ...settings, ...newSettings };
     setSettings(updatedSettings);
-    saveToLocalStorage(LOCAL_SETTINGS_STORAGE_KEY, updatedSettings);
     
     if (supabaseClient && supabaseStatus === 'connected') {
         try {
@@ -368,3 +347,5 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     </AppContext.Provider>
   );
 };
+
+    
