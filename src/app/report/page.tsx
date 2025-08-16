@@ -39,37 +39,56 @@ export default function ReportPage() {
 
     setIsGenerating(true);
 
-    // Temporarily add a class for PDF generation styling, if needed
     reportElement.classList.add('pdf-generation');
     
-    // Hide scrollbars during capture
     const originalStyle = reportElement.style.overflow;
     reportElement.style.overflow = 'visible';
 
     const canvas = await html2canvas(reportElement, {
-        scale: 2, // Higher scale for better quality
+        scale: 2,
         useCORS: true,
         logging: false,
     });
     
-    // Restore original styles
     reportElement.style.overflow = originalStyle;
     reportElement.classList.remove('pdf-generation');
-
-    setIsGenerating(false);
-
+    
     const imgData = canvas.toDataURL('image/png');
     const pdf = new jsPDF({
         orientation: 'landscape',
-        unit: 'px',
-        format: [canvas.width, canvas.height]
+        unit: 'mm',
+        format: 'a4'
     });
 
-    pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = pdf.internal.pageSize.getHeight();
+    const imgWidth = canvas.width;
+    const imgHeight = canvas.height;
+    const ratio = imgWidth / imgHeight;
+    const newImgHeight = pdfWidth / ratio;
+
+    let height = newImgHeight;
+    let position = 0;
+    
+    if (newImgHeight > pdfHeight) {
+        height = pdfHeight;
+    }
+
+    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, height);
+    let remainingHeight = newImgHeight - pdfHeight;
+
+    while (remainingHeight > 0) {
+        position -= pdfHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, newImgHeight);
+        remainingHeight -= pdfHeight;
+    }
+
 
     const fromDate = dateRange?.from ? format(dateRange.from, 'dd-MM-yy') : 'start';
     const toDate = dateRange?.to ? format(dateRange.to, 'dd-MM-yy') : 'end';
     pdf.save(`Laxmi_Shree_Report_${fromDate}_to_${toDate}.pdf`);
+    setIsGenerating(false);
   };
 
 

@@ -101,7 +101,18 @@ body {
     width: 100%;
     font-size: 8px; /* Even smaller font for print */
   }
-  .print-only {
-    display: inline !important;
+  .print-table th, .print-table td {
+    padding: 2px 4px;
   }
+  .print-only {
+    display: table-row !important;
+  }
+}
+
+.pdf-generation .print-table {
+    font-size: 10px;
+}
+.pdf-generation .print-table th,
+.pdf-generation .print-table td {
+    padding: 2px 4px;
 }
