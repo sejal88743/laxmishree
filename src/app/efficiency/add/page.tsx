@@ -106,7 +106,7 @@ export default function AddEfficiencyRecordPage() {
 
 
   const processScanResult = (result: Awaited<ReturnType<typeof scanLoomDisplay>>) => {
-    const valuesToSet: Partial<z.infer<typeof formSchema>> = {};
+    const valuesToSet: Partial<Omit<z.infer<typeof formSchema>, 'date'>> = {};
     if (result.time) valuesToSet.time = result.time;
     if (result.shift) {
         if (result.shift.toUpperCase() === 'A') valuesToSet.shift = 'Day';
@@ -173,9 +173,25 @@ export default function AddEfficiencyRecordPage() {
   };
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
+    const dateString = format(values.date, 'yyyy-MM-dd');
+    
+    // Check for duplicate record
+    const isDuplicate = records.some(
+      r => r.date === dateString && r.shift === values.shift && r.machineNo === values.machineNo
+    );
+
+    if (isDuplicate) {
+      toast({
+        variant: 'destructive',
+        title: 'Duplicate Record',
+        description: `A record for Machine ${values.machineNo} on ${format(values.date, 'dd/MM/yy')} (${values.shift} shift) already exists.`,
+      });
+      return;
+    }
+
     const record: Omit<LoomRecord, 'id'> = {
       ...values,
-      date: format(values.date, 'yyyy-MM-dd'),
+      date: dateString,
     };
     addRecord(record);
     toast({ title: 'Record Saved!', description: `Record for Machine ${values.machineNo} has been added.` });

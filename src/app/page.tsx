@@ -5,6 +5,7 @@ import React, { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ArrowUp, ArrowDown, AlertTriangle, BarChart as BarChartIcon, LayoutDashboard } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useAppState } from '@/hooks/use-app-state';
@@ -44,14 +45,19 @@ export default function Dashboard() {
   }, [records, today, settings.totalMachines]);
 
   const dailySummary = useMemo(() => {
-    const summary: { date: string; totalWeft: number }[] = [];
+    const summary: { date: string; totalWeft: number, avgEfficiency: number }[] = [];
     for (let i = 0; i < 8; i++) {
       const date = new Date(today);
       date.setDate(today.getDate() - i);
       const dateString = date.toISOString().split('T')[0];
       const dayRecords = records.filter(r => r.date === dateString);
+      
       const totalWeft = dayRecords.reduce((acc, r) => acc + r.weftMeter, 0);
-      summary.push({ date: date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }), totalWeft });
+      const totalRun = dayRecords.reduce((acc, r) => acc + timeToSeconds(r.run), 0);
+      const totalTime = dayRecords.reduce((acc, r) => acc + timeToSeconds(r.total), 0);
+      const avgEfficiency = calculateEfficiency(totalRun, totalTime);
+
+      summary.push({ date: date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }), totalWeft, avgEfficiency });
     }
     return summary.reverse();
   }, [records, today]);
@@ -75,7 +81,7 @@ export default function Dashboard() {
       machineEfficiencies[r.machineNo].recordCount++;
     });
     
-    const alerts: { machineNo: string; avgEfficiency: number, data: {date: string, efficiency: number, stops: number}[] }[] = [];
+    const alerts: { machineNo: string; avgEfficiency: number, totalStops: number, data: {date: string, efficiency: number, stops: number}[] }[] = [];
     Object.entries(machineEfficiencies).forEach(([machineNo, data]) => {
       if (data.recordCount === 0) return;
 
@@ -99,7 +105,7 @@ export default function Dashboard() {
           };
         }).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-        alerts.push({ machineNo, avgEfficiency, data: efficiencyByDate });
+        alerts.push({ machineNo, avgEfficiency, totalStops: data.totalStops, data: efficiencyByDate });
       }
     });
     return alerts;
@@ -167,7 +173,7 @@ export default function Dashboard() {
                         </CardHeader>
                         <CardContent className="p-2">
                         <p className="text-lg font-bold text-primary">{day.totalWeft.toLocaleString()}</p>
-                        <p className="text-xs text-muted-foreground">Weft</p>
+                        <p className="text-[11px] font-bold text-muted-foreground">{day.avgEfficiency.toFixed(2)}%</p>
                         </CardContent>
                     </Card>
                     ))}
@@ -177,21 +183,34 @@ export default function Dashboard() {
                 {lowEfficiencyAlerts.length > 0 && (
                 <section>
                     <Alert variant="destructive" className="bg-red-100 border-red-400 text-red-800">
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-center mb-2">
                         <div className="flex items-center">
                         <AlertTriangle className="h-4 w-4" />
-                        <AlertTitle className="ml-2 font-bold">Low Efficiency Alert</AlertTitle>
+                        <AlertTitle className="ml-2 font-bold">Low Efficiency Alert (Last 3 Days)</AlertTitle>
                         </div>
                         <Button onClick={handleWhatsAppShare} size="sm" className="bg-green-500 hover:bg-green-600 text-white p-2 h-auto">
                         <WhatsAppIcon className="h-4 w-4" />
                         </Button>
                     </div>
                     <AlertDescription className="mt-2 text-sm">
-                        {lowEfficiencyAlerts.map(alert => (
-                        <div key={alert.machineNo} className="mb-1">
-                            Machine <strong>{alert.machineNo}</strong> is at <strong>{alert.avgEfficiency.toFixed(2)}%</strong> avg. efficiency (Threshold: {settings.lowEfficiencyThreshold}%)
-                        </div>
-                        ))}
+                        <Table className="text-xs">
+                          <TableHeader>
+                            <TableRow className='text-red-900'>
+                              <TableHead className='h-8'>M/C</TableHead>
+                              <TableHead className='h-8'>Avg Eff</TableHead>
+                              <TableHead className='h-8'>Stops</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {lowEfficiencyAlerts.map(alert => (
+                              <TableRow key={alert.machineNo} className="font-bold border-red-300">
+                                <TableCell className='p-1'>{alert.machineNo}</TableCell>
+                                <TableCell className='p-1'>{alert.avgEfficiency.toFixed(2)}%</TableCell>
+                                <TableCell className='p-1'>{alert.totalStops}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
                     </AlertDescription>
                     </Alert>
                 </section>
