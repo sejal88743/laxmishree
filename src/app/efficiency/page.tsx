@@ -1,7 +1,9 @@
+
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -10,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Calendar as CalendarIcon, PlusCircle, MoreVertical, Edit, Trash2 } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { format, parse, isValid } from 'date-fns';
 import { useAppState } from '@/hooks/use-app-state';
 import { processRecord } from '@/lib/calculations';
 import type { CalculatedLoomRecord } from '@/lib/types';
@@ -19,9 +21,20 @@ import { cn } from '@/lib/utils';
 
 export default function EfficiencyPage() {
   const { records, deleteRecord, settings } = useAppState();
+  const searchParams = useSearchParams();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   
+  useEffect(() => {
+    const dateParam = searchParams.get('date');
+    if (dateParam) {
+      const parsedDate = parse(dateParam, 'yyyy-MM-dd', new Date());
+      if (isValid(parsedDate)) {
+        setSelectedDate(parsedDate);
+      }
+    }
+  }, [searchParams]);
+
   const handleWhatsAppShare = (record: CalculatedLoomRecord) => {
     if (!settings.whatsAppNumber) {
         alert("Please set a WhatsApp number in settings.");
@@ -171,3 +184,5 @@ export default function EfficiencyPage() {
     </div>
   );
 }
+
+    

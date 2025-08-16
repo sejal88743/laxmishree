@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -13,15 +14,23 @@ import { calculateEfficiency, timeToSeconds } from '@/lib/calculations';
 import type { LoomRecord } from '@/lib/types';
 import WhatsAppIcon from '@/components/WhatsAppIcon';
 import { format } from 'date-fns';
+import { useRouter } from 'next/navigation';
+
 
 export default function Dashboard() {
   const { records, settings } = useAppState();
   const [view, setView] = useState<'card' | 'chart'>('card');
+  const router = useRouter();
 
   const today = new Date();
 
   const performanceData = useMemo(() => {
-    const machineData: { [key: string]: { todayEfficiency: number, yesterdayEfficiency: number } } = {};
+    const machineData: { [key: string]: { 
+        todayEfficiency: number, 
+        yesterdayEfficiency: number,
+        todayWeft: number,
+        yesterdayWeft: number
+    } } = {};
     const machineNumbers = Array.from({ length: settings.totalMachines || 0 }, (_, i) => (i + 1).toString());
 
     machineNumbers.forEach(machineNo => {
@@ -32,12 +41,17 @@ export default function Dashboard() {
 
       const todayTotalRun = todayRecords.reduce((acc, r) => acc + timeToSeconds(r.run), 0);
       const todayTotalTime = todayRecords.reduce((acc, r) => acc + timeToSeconds(r.total), 0);
+      const todayWeft = todayRecords.reduce((acc, r) => acc + r.weftMeter, 0);
+
       const yesterdayTotalRun = yesterdayRecords.reduce((acc, r) => acc + timeToSeconds(r.run), 0);
       const yesterdayTotalTime = yesterdayRecords.reduce((acc, r) => acc + timeToSeconds(r.total), 0);
+      const yesterdayWeft = yesterdayRecords.reduce((acc, r) => acc + r.weftMeter, 0);
 
       machineData[machineNo] = {
         todayEfficiency: calculateEfficiency(todayTotalRun, todayTotalTime),
         yesterdayEfficiency: calculateEfficiency(yesterdayTotalRun, yesterdayTotalTime),
+        todayWeft: todayWeft,
+        yesterdayWeft: yesterdayWeft,
       };
     });
 
@@ -45,7 +59,7 @@ export default function Dashboard() {
   }, [records, today, settings.totalMachines]);
 
   const dailySummary = useMemo(() => {
-    const summary: { date: string; totalWeft: number, avgEfficiency: number }[] = [];
+    const summary: { date: string; dateObj: Date; totalWeft: number, avgEfficiency: number }[] = [];
     for (let i = 0; i < 8; i++) {
       const date = new Date(today);
       date.setDate(today.getDate() - i);
@@ -57,7 +71,7 @@ export default function Dashboard() {
       const totalTime = dayRecords.reduce((acc, r) => acc + timeToSeconds(r.total), 0);
       const avgEfficiency = calculateEfficiency(totalRun, totalTime);
 
-      summary.push({ date: date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }), totalWeft, avgEfficiency });
+      summary.push({ date: date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }), dateObj: date, totalWeft, avgEfficiency });
     }
     return summary.reverse();
   }, [records, today]);
@@ -146,6 +160,10 @@ export default function Dashboard() {
     const message = encodeURIComponent(`Low Efficiency Alert:\n\n${messageLines.join('\n\n')}`);
     window.open(`https://wa.me/${settings.whatsAppNumber}?text=${message}`);
   };
+  
+  const handleDailySummaryClick = (date: Date) => {
+    router.push(`/efficiency?date=${format(date, 'yyyy-MM-dd')}`);
+  }
 
 
   return (
@@ -167,7 +185,7 @@ export default function Dashboard() {
                 <section>
                 <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
                     {dailySummary.map(day => (
-                    <Card key={day.date} className="text-center bg-card shadow-lg border-none">
+                    <Card key={day.date} className="text-center bg-card shadow-lg border-none cursor-pointer" onClick={() => handleDailySummaryClick(day.dateObj)}>
                         <CardHeader className="p-2">
                         <CardTitle className="text-xs font-medium text-muted-foreground">{day.date}</CardTitle>
                         </CardHeader>
@@ -218,24 +236,25 @@ export default function Dashboard() {
 
                 <section>
                 <h2 className="text-lg font-semibold text-primary mb-2">Today's Performance</h2>
-                <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-2">
                     {Object.entries(performanceData).map(([machineNo, data]) => {
                     const trend = data.todayEfficiency - data.yesterdayEfficiency;
                     const cardColor = data.todayEfficiency >= settings.lowEfficiencyThreshold ? 'bg-green-100 border-green-300' : data.todayEfficiency > (settings.lowEfficiencyThreshold * 0.9) ? 'bg-blue-100 border-blue-300' : 'bg-red-100 border-red-300';
                     const textColor = data.todayEfficiency >= settings.lowEfficiencyThreshold ? 'text-green-800' : data.todayEfficiency > (settings.lowEfficiencyThreshold * 0.9) ? 'text-blue-800' : 'text-red-800';
 
                     return (
-                        <Card key={machineNo} className={`text-center shadow-md ${cardColor} ${textColor}`}>
-                        <CardHeader className="p-2">
-                            <CardTitle className="text-sm font-bold">M {machineNo}</CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-2">
-                            <p className="text-xl font-bold">{data.todayEfficiency.toFixed(1)}%</p>
-                            <div className={`flex items-center justify-center text-xs ${trend >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {trend !== 0 && (trend > 0 ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
-                            {data.yesterdayEfficiency > 0 ? `${Math.abs(trend).toFixed(1)}%` : 'New'}
-                            </div>
-                        </CardContent>
+                        <Card key={machineNo} className={`shadow-md ${cardColor} ${textColor}`}>
+                            <CardHeader className="p-2 text-center">
+                                <CardTitle className="text-sm font-bold">M {machineNo}</CardTitle>
+                            </CardHeader>
+                            <CardContent className="p-2 text-[11px] font-bold">
+                                <div className="flex justify-between"><span>Today:</span><span>{data.todayEfficiency.toFixed(1)}% ({data.todayWeft.toFixed(0)}m)</span></div>
+                                <div className="flex justify-between"><span>Prev:</span><span>{data.yesterdayEfficiency.toFixed(1)}% ({data.yesterdayWeft.toFixed(0)}m)</span></div>
+                                <div className={`flex items-center justify-center text-xs mt-1 ${trend >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                {trend !== 0 && (trend > 0 ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
+                                {data.yesterdayEfficiency > 0 ? `${Math.abs(trend).toFixed(1)}%` : 'New'}
+                                </div>
+                            </CardContent>
                         </Card>
                     );
                     })}
@@ -290,3 +309,5 @@ export default function Dashboard() {
     </div>
   );
 }
+
+    
