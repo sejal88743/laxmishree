@@ -177,11 +177,11 @@ export default function ReportPage() {
     return (
         <div className="w-full print-card">
             <h4 className="font-semibold text-center text-sm mb-1 text-primary">{shift} Shift</h4>
-            <Table className="text-[10px] print-table">
+            <Table className="text-[10px] font-bold print-table">
                 <TableHeader>
                     <TableRow className="no-print">
                         {tableHeaders.map(({ key, label }) => (
-                            <TableHead key={key} className={cn(cellPadding)}>
+                            <TableHead key={key} className={cn(cellPadding, 'text-[10px] font-bold')}>
                                 <Button variant="ghost" onClick={() => requestSort(key)} className="p-0 h-auto text-[10px] font-bold hover:bg-transparent">
                                     {label} {getSortIcon(key)}
                                 </Button>
@@ -190,13 +190,13 @@ export default function ReportPage() {
                     </TableRow>
                      <TableRow className='print-only'>
                         {tableHeaders.map(({ key, label }) => (
-                            <TableHead key={`${key}-print`} className={cn(cellPadding, 'font-bold')}>{label}</TableHead>
+                            <TableHead key={`${key}-print`} className={cn(cellPadding, 'font-bold text-[10px]')}>{label}</TableHead>
                         ))}
                     </TableRow>
                 </TableHeader>
                 <TableBody>
                     {shiftData.map(r => (
-                        <TableRow key={r.id} className="font-bold">
+                        <TableRow key={r.id}>
                             <TableCell className={cn(cellPadding, 'text-gray-700')}>{format(parseISO(r.date), 'dd/MM')}</TableCell>
                             <TableCell className={cn(cellPadding, 'text-gray-700')}>{r.time}</TableCell>
                             <TableCell className={cn(cellPadding, 'text-purple-600')}>{r.machineNo}</TableCell>
@@ -224,7 +224,7 @@ export default function ReportPage() {
   }
 
   return (
-    <div className="p-1 space-y-2">
+    <div className="p-0 sm:p-1 space-y-2">
       <Card className="no-print shadow-none border-0 m-0">
         <CardContent className="grid grid-cols-2 gap-2 p-1">
           <div>

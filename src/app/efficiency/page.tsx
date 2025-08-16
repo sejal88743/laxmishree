@@ -124,12 +124,12 @@ export default function EfficiencyPage() {
       </CardHeader>
       <CardContent className="p-0">
         <div className="overflow-x-auto">
-          <Table className="text-xs">
+          <Table className="text-[10px] font-bold">
             <TableHeader>
               <TableRow>
                 {tableHeaders.map(({ key, label }) => (
                     <TableHead key={key} className={cellPadding}>
-                        <Button variant="ghost" onClick={() => requestSort(key)} className="p-0 h-auto text-xs font-bold hover:bg-transparent">
+                        <Button variant="ghost" onClick={() => requestSort(key)} className="p-0 h-auto text-[10px] font-bold hover:bg-transparent">
                             {label} {getSortIcon(key)}
                         </Button>
                     </TableHead>
@@ -139,7 +139,7 @@ export default function EfficiencyPage() {
             </TableHeader>
             <TableBody>
               {data.map(record => (
-                <TableRow key={record.id} className="font-bold">
+                <TableRow key={record.id}>
                   <TableCell className={cn(cellPadding, 'text-gray-700')}>{record.time}</TableCell>
                   <TableCell className={cn(cellPadding, 'text-purple-600')}>{record.machineNo}</TableCell>
                   <TableCell className={cn(cellPadding, 'text-orange-600')}>{record.stops}</TableCell>
