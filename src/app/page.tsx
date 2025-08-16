@@ -232,7 +232,7 @@ export default function Dashboard() {
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-2">
                     {Object.entries(performanceData).map(([machineNo, data]) => {
                     const trend = data.todayEfficiency - data.yesterdayEfficiency;
-                    const cardColor = data.todayEfficiency >= 95 ? 'bg-green-100 border-green-300' : data.todayEfficiency >= 90 ? 'bg-yellow-100 border-yellow-300' : 'bg-red-100 border-red-300';
+                    const cardColor = data.todayEfficiency >= 95 ? 'bg-green-100/20 border-green-300' : data.todayEfficiency >= 90 ? 'bg-yellow-100/20 border-yellow-300' : 'bg-red-100/20 border-red-300';
                     const textColor = data.todayEfficiency >= 95 ? 'text-green-800' : data.todayEfficiency >= 90 ? 'text-yellow-800' : 'text-red-800';
 
                     return (
@@ -244,8 +244,10 @@ export default function Dashboard() {
                                 <div className="flex justify-between"><span>Today:</span><span>{data.todayEfficiency.toFixed(1)}% ({data.todayWeft.toFixed(0)}m)</span></div>
                                 <div className="flex justify-between"><span>Prev:</span><span>{data.yesterdayEfficiency.toFixed(1)}% ({data.yesterdayWeft.toFixed(0)}m)</span></div>
                                 <div className={`flex items-center justify-center text-xs mt-1 ${trend >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                {trend !== 0 && (trend > 0 ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
-                                {data.yesterdayEfficiency > 0 ? `${Math.abs(trend).toFixed(1)}%` : 'New'}
+                                {trend > 0 && <ArrowUp className="h-3 w-3" />}
+                                {trend < 0 && <ArrowDown className="h-3 w-3" />}
+                                {data.yesterdayEfficiency > 0 && trend !== 0 ? `${Math.abs(trend).toFixed(1)}%` : null}
+                                {data.yesterdayEfficiency === 0 && data.todayEfficiency > 0 && <ArrowUp className="h-3 w-3" />}
                                 </div>
                             </CardContent>
                         </Card>
@@ -284,5 +286,3 @@ export default function Dashboard() {
     </div>
   );
 }
-
-    
