@@ -98,7 +98,13 @@ body {
   .print-card {
     border: 1px solid #ccc;
     page-break-inside: avoid;
-    width: 100%; /* For portrait side-by-side */
+    width: 49%;
+    padding: 0.5rem;
+  }
+  .print-shifts-container {
+      flex-direction: row;
+      justify-content: space-between;
+      gap: 2%;
   }
   .print-table {
     width: 100%;
@@ -110,18 +116,20 @@ body {
   .print-only {
     display: table-row !important;
   }
-  .print-shifts-container {
-      flex-direction: column; /* Stack shifts vertically */
-  }
 }
 
 .pdf-generation {
     .print-shifts-container {
-        flex-direction: column;
+        display: flex;
+        flex-direction: row;
+        justify-content: space-between;
+        gap: 2%;
     }
     .print-card {
-        width: 100%;
+        width: 49%;
         margin-bottom: 1rem;
+        border: 1px solid #eee;
+        padding: 0.5rem;
     }
 }
 .pdf-generation .print-table {

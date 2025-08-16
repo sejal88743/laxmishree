@@ -58,24 +58,25 @@ export default function ReportPage() {
 
     const pdfWidth = pdf.internal.pageSize.getWidth();
     const pdfHeight = pdf.internal.pageSize.getHeight();
+    const margin = 0.25;
     
     const canvasWidth = canvas.width;
     const canvasHeight = canvas.height;
     
-    const ratio = canvasWidth / canvasHeight;
-    let imgHeight = pdfWidth / ratio;
+    const imgWidth = pdfWidth - (margin * 2);
+    const imgHeight = (canvasHeight * imgWidth) / canvasWidth;
     
     let heightLeft = imgHeight;
     let position = 0;
 
-    pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
-    heightLeft -= pdfHeight;
+    pdf.addImage(imgData, 'PNG', margin, margin + position, imgWidth, imgHeight);
+    heightLeft -= (pdfHeight - (margin * 2));
 
     while (heightLeft > 0) {
-      position = heightLeft - imgHeight; 
+      position -= (pdfHeight - (margin * 2));
       pdf.addPage();
-      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
-      heightLeft -= pdfHeight;
+      pdf.addImage(imgData, 'PNG', margin, margin + position, imgWidth, imgHeight);
+      heightLeft -= (pdfHeight - (margin * 2));
     }
 
     const fromDate = dateRange?.from ? format(dateRange.from, 'dd-MM-yy') : 'start';
@@ -144,12 +145,6 @@ export default function ReportPage() {
     setSortConfig({ key, direction });
   };
   
-  const getSortIcon = (key: SortKey) => {
-    if (!sortConfig || sortConfig.key !== key) {
-        return null;
-    }
-    return sortConfig.direction === 'asc' ? '▲' : '▼';
-  }
 
   const tableHeaders: { key: SortKey; label: string; className: string }[] = [
       { key: 'date', label: 'Date', className: 'text-gray-700' },
@@ -225,8 +220,8 @@ export default function ReportPage() {
 
   return (
     <div className="space-y-2 p-0 m-0">
-      <Card className="no-print shadow-none border-0 m-0">
-        <CardContent className="grid grid-cols-2 gap-1 p-1">
+      <Card className="no-print m-0 p-1">
+        <CardContent className="grid grid-cols-2 gap-1 p-0">
           <div>
             <Popover>
               <PopoverTrigger asChild>
@@ -268,7 +263,7 @@ export default function ReportPage() {
       </Card>
 
       <div ref={componentRef} className="print-container">
-        <Card className="shadow-none border-0 m-0 p-0">
+        <Card className="m-0 p-0">
           <CardHeader className='p-1'>
             <CardTitle className="text-center text-lg font-bold text-primary">Laxmi Shree Efficiency Report</CardTitle>
             <p className="text-center text-xs text-muted-foreground">
