@@ -216,46 +216,45 @@ export default function AddEfficiencyRecordPage() {
 
   if (showCamera) {
     return (
-      <div className="space-y-4">
-        <Card className="m-0 shadow-lg border-0">
-          <CardHeader>
-            <CardTitle className="text-primary">Scan Display</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-             <div className='relative'>
-                <video ref={videoRef} className="w-full aspect-video rounded-md bg-black" autoPlay muted playsInline />
-                <canvas ref={canvasRef} className="hidden" />
-                {isScanning && <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-md"><Loader2 className="h-10 w-10 animate-spin text-white" /></div>}
-             </div>
+      <div className="fixed inset-0 bg-black z-50 flex flex-col items-center justify-center p-4">
+        <div className='relative w-full h-full flex items-center justify-center'>
+            <video ref={videoRef} className="w-full h-full object-contain" autoPlay muted playsInline />
+            <canvas ref={canvasRef} className="hidden" />
+            {isScanning && (
+                <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-md">
+                    <Loader2 className="h-10 w-10 animate-spin text-white" />
+                </div>
+            )}
+        </div>
 
-            {hasCameraPermission === false && (
+        {hasCameraPermission === false && (
+            <div className="absolute top-4 left-4 right-4">
                 <Alert variant="destructive">
                   <AlertTitle>Camera Access Required</AlertTitle>
                   <AlertDescription>
                     Please allow camera access to use this feature.
                   </AlertDescription>
                 </Alert>
-            )}
-
-            <div className="flex gap-2">
-              <Button onClick={handleCapture} className="w-full" disabled={isScanning || !hasCameraPermission}>
-                <Camera className="mr-2 h-4 w-4" /> Capture
-              </Button>
-              <Button onClick={() => setShowCamera(false)} variant="outline" className="w-full">
-                Cancel
-              </Button>
             </div>
-          </CardContent>
-        </Card>
+        )}
+
+        <div className="absolute bottom-4 left-4 right-4 flex gap-4">
+          <Button onClick={handleCapture} className="w-full" disabled={isScanning || !hasCameraPermission}>
+            <Camera className="mr-2 h-4 w-4" /> Capture
+          </Button>
+          <Button onClick={() => setShowCamera(false)} variant="outline" className="w-full bg-black/20 text-white border-white hover:bg-black/50">
+            Cancel
+          </Button>
+        </div>
       </div>
     );
   }
 
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 p-1">
       <Card className="m-0 shadow-lg border-0">
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-row items-center justify-between p-2">
           <div className='flex items-center gap-2'>
             <Button variant="ghost" size="icon" onClick={() => router.back()}>
                 <ArrowLeft />
@@ -274,7 +273,7 @@ export default function AddEfficiencyRecordPage() {
             </Button>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-2">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <div className="grid grid-cols-3 gap-2">
@@ -287,7 +286,7 @@ export default function AddEfficiencyRecordPage() {
                       <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
                         <PopoverTrigger asChild>
                           <FormControl>
-                            <Button variant="outline" className={cn('pl-3 text-left font-normal h-9', !field.value && 'text-muted-foreground')}>
+                            <Button variant="outline" className={cn('pl-3 text-left font-normal h-9 w-full', !field.value && 'text-muted-foreground')}>
                               {field.value ? format(field.value, 'dd/MM/yy') : <span>Pick date</span>}
                               <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                             </Button>
@@ -409,7 +408,7 @@ export default function AddEfficiencyRecordPage() {
 
        {recentRecords.length > 0 && (
         <Card className="mt-4 shadow-lg border-0">
-          <CardHeader>
+          <CardHeader className="p-2">
             <CardTitle className="text-primary text-lg">Recent Entries for {format(watchedDate, 'dd/MM/yy')} - {watchedShift} Shift</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
@@ -443,5 +442,3 @@ export default function AddEfficiencyRecordPage() {
     </div>
   );
 }
-
-    
