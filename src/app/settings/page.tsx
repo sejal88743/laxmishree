@@ -120,10 +120,10 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.settings;
 
 
   return (
-    <div className="p-2">
+    <div className='space-y-2'>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          <Card>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2">
+          <Card className='border-0'>
             <CardHeader><CardTitle className="text-primary">General Settings</CardTitle></CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField control={form.control} name="totalMachines" render={({ field }) => (
@@ -143,7 +143,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.settings;
             </CardContent>
           </Card>
           
-          <Card>
+          <Card className='border-0'>
             <CardHeader><CardTitle className="text-primary">WhatsApp Settings</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <FormField control={form.control} name="whatsAppNumber" render={({ field }) => (
@@ -163,7 +163,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.settings;
             </CardContent>
           </Card>
           
-          <Card>
+          <Card className='border-0'>
             <CardHeader>
               <CardTitle className="text-primary">Backend & Sync Settings</CardTitle>
               <CardDescription>Enter your Supabase credentials to enable cloud sync. The Gemini key is used for AI features and should be set as a server secret in your hosting environment.</CardDescription>
@@ -245,3 +245,5 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.settings;
     </div>
   );
 }
+
+    

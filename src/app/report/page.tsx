@@ -148,7 +148,7 @@ export default function ReportPage() {
     if (!sortConfig || sortConfig.key !== key) {
         return null;
     }
-    return sortConfig.direction === 'asc' ? <span className="ml-1 text-xs">▲</span> : <span className="ml-1 text-xs">▼</span>;
+    return sortConfig.direction === 'asc' ? '▲' : '▼';
   }
 
   const tableHeaders: { key: SortKey; label: string; className: string }[] = [
@@ -183,7 +183,8 @@ export default function ReportPage() {
                         {tableHeaders.map(({ key, label }) => (
                             <TableHead key={key} className={cn(cellPadding, 'text-[10px] font-bold')}>
                                 <Button variant="ghost" onClick={() => requestSort(key)} className="p-0 h-auto text-[10px] font-bold hover:bg-transparent">
-                                    {label} {getSortIcon(key)}
+                                    {label}
+                                    <span className="text-xs w-4 inline-block">{getSortIcon(key)}</span>
                                 </Button>
                             </TableHead>
                         ))}
@@ -224,7 +225,7 @@ export default function ReportPage() {
   }
 
   return (
-    <div className="p-0 sm:p-1 space-y-2">
+    <div className="space-y-2">
       <Card className="no-print shadow-none border-0 m-0">
         <CardContent className="grid grid-cols-2 gap-2 p-1">
           <div>
@@ -305,3 +306,5 @@ export default function ReportPage() {
     </div>
   );
 }
+
+    

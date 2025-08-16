@@ -95,7 +95,7 @@ export default function Dashboard() {
       machineEfficiencies[r.machineNo].recordCount++;
     });
     
-    const alerts: { machineNo: string; avgEfficiency: number, totalStops: number, data: {date: string, efficiency: number, stops: number}[] }[] = [];
+    const alerts: { machineNo: string; avgEfficiency: number, totalStops: number, data: {date: string, efficiency: number, stops: number}[] } = [];
     Object.entries(machineEfficiencies).forEach(([machineNo, data]) => {
       if (data.recordCount === 0) return;
 
@@ -161,7 +161,7 @@ export default function Dashboard() {
 
   return (
     <div className="bg-background">
-      <div className="p-2 space-y-4">
+      <div className="space-y-4">
         <div className="flex gap-2">
             <Button onClick={() => setView('card')} variant={view === 'card' ? 'secondary' : 'ghost'} className="w-full">
                 <LayoutDashboard className="mr-2 h-4 w-4" />
@@ -260,9 +260,9 @@ export default function Dashboard() {
       </div>
 
       {view === 'chart' && (
-        <section className="space-y-4 p-2">
+        <section className="space-y-4">
           <div>
-            <Card className="shadow-lg">
+            <Card className="shadow-lg border-0">
               <CardHeader>
                 <CardTitle className="text-lg font-semibold text-primary text-center">Shift Performance (Last 30 Days)</CardTitle>
               </CardHeader>
@@ -286,3 +286,5 @@ export default function Dashboard() {
     </div>
   );
 }
+
+    

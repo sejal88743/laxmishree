@@ -93,7 +93,7 @@ export default function EfficiencyPage() {
     if (!sortConfig || sortConfig.key !== key) {
         return null;
     }
-    return sortConfig.direction === 'asc' ? <span className="ml-1 text-xs">▲</span> : <span className="ml-1 text-xs">▼</span>;
+    return sortConfig.direction === 'asc' ? '▲' : '▼';
   }
 
 
@@ -118,7 +118,7 @@ export default function EfficiencyPage() {
     ];
 
     return (
-    <Card>
+    <Card className="shadow-none border-0">
       <CardHeader className="p-2">
         <CardTitle className="text-primary text-xs font-bold">{title}</CardTitle>
       </CardHeader>
@@ -128,13 +128,14 @@ export default function EfficiencyPage() {
             <TableHeader>
               <TableRow>
                 {tableHeaders.map(({ key, label }) => (
-                    <TableHead key={key} className={cellPadding}>
+                    <TableHead key={key} className={cn(cellPadding, "text-[10px] font-bold")}>
                         <Button variant="ghost" onClick={() => requestSort(key)} className="p-0 h-auto text-[10px] font-bold hover:bg-transparent">
-                            {label} {getSortIcon(key)}
+                            {label}
+                            <span className="text-xs w-4 inline-block">{getSortIcon(key)}</span>
                         </Button>
                     </TableHead>
                 ))}
-                <TableHead className={cellPadding}>Act</TableHead>
+                <TableHead className={cn(cellPadding, "text-[10px] font-bold")}>Act</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -206,7 +207,7 @@ export default function EfficiencyPage() {
     }
 
   return (
-    <div className="p-2 space-y-4">
+    <div className="space-y-2">
       <div className="flex justify-between items-center gap-2">
         <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
           <PopoverTrigger asChild>
@@ -242,3 +243,5 @@ export default function EfficiencyPage() {
     </div>
   );
 }
+
+    

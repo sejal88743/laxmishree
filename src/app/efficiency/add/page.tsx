@@ -216,8 +216,8 @@ export default function AddEfficiencyRecordPage() {
 
   if (showCamera) {
     return (
-      <div className="p-2">
-        <Card className="m-0 shadow-lg">
+      <div className="space-y-4">
+        <Card className="m-0 shadow-lg border-0">
           <CardHeader>
             <CardTitle className="text-primary">Scan Display</CardTitle>
           </CardHeader>
@@ -253,8 +253,8 @@ export default function AddEfficiencyRecordPage() {
 
 
   return (
-    <div className="p-2 space-y-4">
-      <Card className="m-0 shadow-lg">
+    <div className="space-y-4">
+      <Card className="m-0 shadow-lg border-0">
         <CardHeader className="flex flex-row items-center justify-between">
           <div className='flex items-center gap-2'>
             <Button variant="ghost" size="icon" onClick={() => router.back()}>
@@ -408,7 +408,7 @@ export default function AddEfficiencyRecordPage() {
       </Card>
 
        {recentRecords.length > 0 && (
-        <Card className="mt-4 shadow-lg">
+        <Card className="mt-4 shadow-lg border-0">
           <CardHeader>
             <CardTitle className="text-primary text-lg">Recent Entries for {format(watchedDate, 'dd/MM/yy')} - {watchedShift} Shift</CardTitle>
           </CardHeader>
@@ -443,3 +443,5 @@ export default function AddEfficiencyRecordPage() {
     </div>
   );
 }
+
+    
