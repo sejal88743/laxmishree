@@ -113,6 +113,9 @@ export default function ReportPage() {
       { key: 'stops', label: 'Stops', className: 'text-orange-600' },
       { key: 'weftMeter', label: 'Weft', className: 'text-teal-600' },
       { key: 'efficiency', label: 'Eff(%)', className: 'text-green-600' },
+      { key: 'total', label: 'Total', className: 'text-gray-700' },
+      { key: 'run', label: 'Run', className: 'text-gray-700' },
+      { key: 'diff', label: 'Diff', className: 'text-pink-600' },
       { key: 'lossPrd', label: 'LossPrd', className: 'text-red-700' }
   ];
   
@@ -151,6 +154,9 @@ export default function ReportPage() {
                             <TableCell className={cn(cellPadding, 'text-orange-600')}>{r.stops}</TableCell>
                             <TableCell className={cn(cellPadding, 'text-teal-600')}>{r.weftMeter.toFixed(1)}</TableCell>
                             <TableCell className={cn(cellPadding, 'text-green-600')}>{r.efficiency.toFixed(2)}</TableCell>
+                            <TableCell className={cn(cellPadding, 'text-gray-700')}>{r.total}</TableCell>
+                            <TableCell className={cn(cellPadding, 'text-gray-700')}>{r.run}</TableCell>
+                            <TableCell className={cn(cellPadding, 'text-pink-600')}>{r.diff}</TableCell>
                             <TableCell className={cn(cellPadding, 'text-red-700')}>{r.lossPrd.toFixed(2)}</TableCell>
                         </TableRow>
                     ))}
@@ -159,7 +165,7 @@ export default function ReportPage() {
                     <TableRow className="font-bold bg-primary/10 text-primary">
                         <TableCell colSpan={4} className={cellPadding}>Total</TableCell>
                         <TableCell className={cellPadding}>{totalWeft.toFixed(2)}</TableCell>
-                        <TableCell></TableCell>
+                        <TableCell colSpan={4}></TableCell>
                         <TableCell className={cellPadding}>{totalLossPrd.toFixed(2)}</TableCell>
                     </TableRow>
                 </TFoot>
