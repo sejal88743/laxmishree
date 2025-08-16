@@ -216,9 +216,11 @@ export default function ReportPage() {
             </Select>
           </div>
           <div className="flex items-end">
-            <Button onClick={handlePrint} className="w-full bg-accent hover:bg-accent/90">
-              <Printer className="mr-2 h-4 w-4" /> Print Report
-            </Button>
+            <div onClick={handlePrint} className="w-full">
+                <Button className="w-full bg-accent hover:bg-accent/90 pointer-events-none">
+                <Printer className="mr-2 h-4 w-4" /> Print Report
+                </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
