@@ -160,7 +160,7 @@ export default function Dashboard() {
 
 
   return (
-    <div className="bg-background">
+    <div className="bg-background m-0 p-0">
       <div className="space-y-4">
         <div className="flex gap-2">
             <Button onClick={() => setView('card')} variant={view === 'card' ? 'secondary' : 'ghost'} className="w-full">
@@ -204,24 +204,26 @@ export default function Dashboard() {
                         </Button>
                     </div>
                     <AlertDescription className="mt-2 text-sm">
-                        <Table className="text-xs">
-                          <TableHeader>
-                            <TableRow className='text-red-900'>
-                              <TableHead className='h-8'>M/C</TableHead>
-                              <TableHead className='h-8'>Avg Eff</TableHead>
-                              <TableHead className='h-8'>Stops</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {lowEfficiencyAlerts.map(alert => (
-                              <TableRow key={alert.machineNo} className="font-bold border-red-300">
-                                <TableCell className='p-1'>{alert.machineNo}</TableCell>
-                                <TableCell className='p-1'>{alert.avgEfficiency.toFixed(2)}%</TableCell>
-                                <TableCell className='p-1'>{alert.totalStops}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
+                        <div className='w-full max-w-[30%]'>
+                            <Table className="text-xs">
+                            <TableHeader>
+                                <TableRow className='text-red-900'>
+                                <TableHead className='h-8'>M/C</TableHead>
+                                <TableHead className='h-8'>Avg Eff</TableHead>
+                                <TableHead className='h-8'>Stops</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {lowEfficiencyAlerts.map(alert => (
+                                <TableRow key={alert.machineNo} className="font-bold border-red-300">
+                                    <TableCell className='p-1'>{alert.machineNo}</TableCell>
+                                    <TableCell className='p-1'>{alert.avgEfficiency.toFixed(2)}%</TableCell>
+                                    <TableCell className='p-1'>{alert.totalStops}</TableCell>
+                                </TableRow>
+                                ))}
+                            </TableBody>
+                            </Table>
+                        </div>
                     </AlertDescription>
                     </Alert>
                 </section>
@@ -229,7 +231,7 @@ export default function Dashboard() {
 
                 <section>
                 <h2 className="text-lg font-semibold text-primary mb-2">Today's Performance</h2>
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-2">
+                <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-2">
                     {Object.entries(performanceData).map(([machineNo, data]) => {
                     const trend = data.todayEfficiency - data.yesterdayEfficiency;
                     const cardColor = data.todayEfficiency >= 95 ? 'bg-green-100/20 border-green-300' : data.todayEfficiency >= 90 ? 'bg-yellow-100/20 border-yellow-300' : 'bg-red-100/20 border-red-300';

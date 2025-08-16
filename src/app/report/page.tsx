@@ -164,7 +164,7 @@ export default function ReportPage() {
       { key: 'lossPrd', label: 'LossPrd', className: 'text-red-700' }
   ];
   
-  const cellPadding = "p-0.5";
+  const cellPadding = "p-[2px]";
 
 
   const renderTableForShift = (data: CalculatedLoomRecord[], shift: 'Day' | 'Night') => {
@@ -179,12 +179,11 @@ export default function ReportPage() {
             <h4 className="font-semibold text-center text-sm mb-1 text-primary">{shift} Shift</h4>
             <Table className="text-[10px] font-bold print-table">
                 <TableHeader>
-                    <TableRow className="no-print">
+                     <TableRow className='no-print'>
                         {tableHeaders.map(({ key, label }) => (
                             <TableHead key={key} className={cn(cellPadding, 'text-[10px] font-bold')}>
                                 <Button variant="ghost" onClick={() => requestSort(key)} className="p-0 h-auto text-[10px] font-bold hover:bg-transparent">
                                     {label}
-                                    <span className="text-xs w-4 inline-block">{getSortIcon(key)}</span>
                                 </Button>
                             </TableHead>
                         ))}
@@ -225,7 +224,7 @@ export default function ReportPage() {
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 p-0 m-0">
       <Card className="no-print shadow-none border-0 m-0">
         <CardContent className="grid grid-cols-2 gap-1 p-1">
           <div>
@@ -280,15 +279,17 @@ export default function ReportPage() {
              </div>
           </CardHeader>
           <CardContent className='p-0'>
-            {groupedRecords.map(([date, dateRecords]) => (
-              <div key={date} className="mb-2">
-                <h3 className="text-md text-center font-bold p-1 bg-muted rounded-sm">{format(parseISO(date), 'EEEE, dd MMMM yyyy')}</h3>
-                <div className="flex flex-col print-shifts-container">
-                    {renderTableForShift(dateRecords, 'Day')}
-                    {renderTableForShift(dateRecords, 'Night')}
+             <div className="space-y-4">
+              {groupedRecords.map(([date, dateRecords]) => (
+                <div key={date} className="mb-2">
+                  <h3 className="text-md text-center font-bold p-1 bg-muted rounded-sm">{format(parseISO(date), 'EEEE, dd MMMM yyyy')}</h3>
+                  <div className="flex flex-col print-shifts-container">
+                      {renderTableForShift(dateRecords, 'Day')}
+                      {renderTableForShift(dateRecords, 'Night')}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
              {groupedRecords.length === 0 && <p className="text-center text-muted-foreground py-10">No records found for the selected filters.</p>}
           </CardContent>
           {filteredRecords.length > 0 && (

@@ -97,7 +97,7 @@ export default function EfficiencyPage() {
   }
 
 
-  const cellPadding = "p-0.5";
+  const cellPadding = "p-[2px]";
 
   const renderRecordsTable = (title: string, data: CalculatedLoomRecord[]) => {
     
@@ -131,7 +131,6 @@ export default function EfficiencyPage() {
                     <TableHead key={key} className={cn(cellPadding, "text-[10px] font-bold")}>
                         <Button variant="ghost" onClick={() => requestSort(key)} className="p-0 h-auto text-[10px] font-bold hover:bg-transparent">
                             {label}
-                            <span className="text-xs w-4 inline-block">{getSortIcon(key)}</span>
                         </Button>
                     </TableHead>
                 ))}
@@ -207,7 +206,7 @@ export default function EfficiencyPage() {
     }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 p-0 m-0">
       <div className="flex justify-between items-center gap-2 px-1">
         <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
           <PopoverTrigger asChild>
