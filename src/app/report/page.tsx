@@ -1,14 +1,15 @@
 'use client';
 
 import React, { useState, useMemo, useRef } from 'react';
-import { useReactToPrint } from 'react-to-print';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter as TFoot } from '@/components/ui/table';
-import { Calendar as CalendarIcon, Printer, ArrowUpDown } from 'lucide-react';
+import { Calendar as CalendarIcon, Download, ArrowUpDown, Loader2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 import { useAppState } from '@/hooks/use-app-state';
@@ -28,18 +29,49 @@ export default function ReportPage() {
   const [machineFilter, setMachineFilter] = useState('all');
   const [shiftFilter, setShiftFilter] = useState<'all' | 'Day' | 'Night'>('all');
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const componentRef = useRef<HTMLDivElement>(null);
 
-  const handlePrint = useReactToPrint({
-    content: () => componentRef.current,
-    pageStyle: `
-      @page {
-        size: A4;
-        margin: 0.5in;
-      }
-    `,
-  });
+  const handleDownloadPdf = async () => {
+    const reportElement = componentRef.current;
+    if (!reportElement) return;
+
+    setIsGenerating(true);
+
+    // Temporarily add a class for PDF generation styling, if needed
+    reportElement.classList.add('pdf-generation');
+    
+    // Hide scrollbars during capture
+    const originalStyle = reportElement.style.overflow;
+    reportElement.style.overflow = 'visible';
+
+    const canvas = await html2canvas(reportElement, {
+        scale: 2, // Higher scale for better quality
+        useCORS: true,
+        logging: false,
+    });
+    
+    // Restore original styles
+    reportElement.style.overflow = originalStyle;
+    reportElement.classList.remove('pdf-generation');
+
+    setIsGenerating(false);
+
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'px',
+        format: [canvas.width, canvas.height]
+    });
+
+    pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+
+    const fromDate = dateRange?.from ? format(dateRange.from, 'dd-MM-yy') : 'start';
+    const toDate = dateRange?.to ? format(dateRange.to, 'dd-MM-yy') : 'end';
+    pdf.save(`Laxmi_Shree_Report_${fromDate}_to_${toDate}.pdf`);
+  };
+
 
   const filteredRecords = useMemo(() => {
     let filtered = records
@@ -137,13 +169,17 @@ export default function ReportPage() {
                 <TableHeader>
                     <TableRow>
                         {tableHeaders.map(({ key, label }) => (
-                            <TableHead key={key} className={cellPadding}>
-                                <Button variant="ghost" onClick={() => requestSort(key)} className="p-0 h-auto text-[10px] font-bold hover:bg-transparent no-print">
+                            <TableHead key={key} className={cn(cellPadding, "no-print")}>
+                                <Button variant="ghost" onClick={() => requestSort(key)} className="p-0 h-auto text-[10px] font-bold hover:bg-transparent">
                                     {label} {getSortIcon(key)}
                                 </Button>
-                                <span className="print-only font-bold">{label}</span>
                             </TableHead>
                         ))}
+                         <TableRow className='print-only'>
+                            {tableHeaders.map(({ key, label }) => (
+                                <TableHead key={`${key}-print`} className={cn(cellPadding, 'font-bold')}>{label}</TableHead>
+                            ))}
+                        </TableRow>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -217,9 +253,10 @@ export default function ReportPage() {
             </Select>
           </div>
           <div className="flex items-end">
-             <Button onClick={handlePrint} className="w-full bg-accent hover:bg-accent/90">
-                <Printer className="mr-2 h-4 w-4" /> Print Report
-             </Button>
+            <Button onClick={handleDownloadPdf} className="w-full bg-accent hover:bg-accent/90" disabled={isGenerating}>
+              {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+              {isGenerating ? 'Generating PDF...' : 'Download PDF'}
+            </Button>
           </div>
         </CardContent>
       </Card>
