@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { createContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
+import React, { createContext, useState, useEffect, ReactNode, useCallback, useRef, useMemo } from 'react';
 import { createClient, SupabaseClient, RealtimeChannel } from '@supabase/supabase-js';
 import type { LoomRecord, AppSettings } from '@/lib/types';
 import { DEFAULT_SETTINGS } from '@/lib/types';
@@ -110,7 +110,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         }
     }
     
-    setPendingSync(remainingOps);
+    if (pendingSync.length !== remainingOps.length) {
+        setPendingSync(remainingOps);
+    }
+    
     isSyncing.current = false;
     
     if (remainingOps.length > 0 && pendingSync.length !== remainingOps.length) {
@@ -130,22 +133,17 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         const client = createClient(supabaseUrl, supabaseKey);
         setSupabaseClient(client);
         initialDataFetched.current = false;
-
-        return () => {
-            client.removeAllChannels();
+    } else if (!supabaseUrl || !supabaseKey) {
+        if(supabaseClient) {
+            supabaseClient.removeAllChannels();
             recordsChannel.current = null;
             settingsChannel.current = null;
             setSupabaseClient(null);
             setSupabaseStatus('disconnected');
-        };
-    } else if (!supabaseUrl || !supabaseKey) {
-        if(supabaseClient) {
-            supabaseClient.removeAllChannels();
-            setSupabaseClient(null);
         }
-        setSupabaseStatus('disconnected');
     }
-  }, [isInitialized, settings.supabaseUrl, settings.supabaseKey, supabaseClient]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isInitialized, settings.supabaseUrl, settings.supabaseKey]);
 
 
   // 5. Manage subscriptions and data fetching
@@ -167,13 +165,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           if (settingsError && settingsError.code !== 'PGRST116') throw settingsError;
 
           if (initialSettings) {
-            const transformedSettings = {
+            const transformedSettings: Partial<AppSettings> = {
               totalMachines: initialSettings.total_machines,
               lowEfficiencyThreshold: initialSettings.low_efficiency_threshold,
               whatsAppNumber: initialSettings.whatsapp_number,
               messageTemplate: initialSettings.message_template,
             };
-            setSettings(prev => {
+             setSettings(prev => {
               const merged = { ...prev, ...transformedSettings };
               saveToLocalStorage(LOCAL_SETTINGS_STORAGE_KEY, merged);
               return merged;
@@ -210,7 +208,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         settingsChannel.current = supabaseClient.channel('settings-channel')
           .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'settings', filter: `id=eq.${GLOBAL_SETTINGS_ID}` }, (payload) => {
             const newSettings = payload.new as any;
-            const transformedSettings = {
+            const transformedSettings: Partial<AppSettings> = {
                 totalMachines: newSettings.total_machines,
                 lowEfficiencyThreshold: newSettings.low_efficiency_threshold,
                 whatsAppNumber: newSettings.whatsapp_number,
@@ -273,7 +271,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     return () => {
         clearInterval(interval);
-    }
+        if (supabaseClient) {
+            supabaseClient.removeAllChannels();
+            recordsChannel.current = null;
+            settingsChannel.current = null;
+        }
+    };
   }, [supabaseClient, processPending, pendingSync.length, supabaseStatus]);
   
 
