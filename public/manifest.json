@@ -1,7 +1,10 @@
 {
   "name": "Laxmi Shree",
   "short_name": "Laxmi Shree",
-  "description": "Loom machine efficiency tracking application",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFFFFF",
+  "theme_color": "#FFFFFF",
   "icons": [
     {
       "src": "/icon-192x192.png",
@@ -13,10 +16,5 @@
       "sizes": "512x512",
       "type": "image/png"
     }
-  ],
-  "theme_color": "#FFFFFF",
-  "background_color": "#FFFFFF",
-  "start_url": "/",
-  "display": "standalone",
-  "orientation": "portrait"
+  ]
 }
