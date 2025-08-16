@@ -126,15 +126,30 @@ export default function Dashboard() {
   }, [records, settings.lowEfficiencyThreshold, today]);
   
   const chartData = useMemo(() => {
+    const data: { [key: string]: { date: string, weft: number } } = {};
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    
+
+    // Initialize data for the last 30 days
+    for (let i = 0; i < 30; i++) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        const dateString = date.toISOString().split('T')[0];
+        data[dateString] = {
+            date: format(date, 'dd/MM'),
+            weft: 0
+        };
+    }
+
     const last30DaysRecords = records.filter(r => new Date(r.date) >= thirtyDaysAgo);
+    
+    last30DaysRecords.forEach(record => {
+        if (data[record.date]) {
+            data[record.date].weft += record.weftMeter;
+        }
+    });
 
-    const dayWeft = last30DaysRecords.filter(r => r.shift === 'Day').reduce((acc, r) => acc + r.weftMeter, 0);
-    const nightWeft = last30DaysRecords.filter(r => r.shift === 'Night').reduce((acc, r) => acc + r.weftMeter, 0);
-
-    return [{ name: 'Total Weft (Last 30 Days)', Day: dayWeft, Night: nightWeft }];
+    return Object.values(data).sort((a, b) => new Date(a.date.split('/').reverse().join('-')).getTime() - new Date(b.date.split('/').reverse().join('-')).getTime());
   }, [records]);
 
 
@@ -160,7 +175,7 @@ export default function Dashboard() {
 
 
   return (
-    <div className="bg-background m-0 p-0">
+    <div className="bg-background m-0 p-1">
       <div className="space-y-4">
         <div className="flex gap-2">
             <Button onClick={() => setView('card')} variant={view === 'card' ? 'secondary' : 'ghost'} className="w-full">
@@ -266,18 +281,17 @@ export default function Dashboard() {
           <div>
             <Card className="shadow-lg border-0">
               <CardHeader>
-                <CardTitle className="text-lg font-semibold text-primary text-center">Shift Performance (Last 30 Days)</CardTitle>
+                <CardTitle className="text-lg font-semibold text-primary text-center">Daily Production (Last 30 Days)</CardTitle>
               </CardHeader>
               <CardContent className="p-0">
                 <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={chartData} margin={{ top: 20, right: 20, left: -10, bottom: 5 }}>
+                  <BarChart data={chartData} margin={{ top: 20, right: 20, left: -20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" fontSize={12} />
+                    <XAxis dataKey="date" fontSize={12} />
                     <YAxis fontSize={12}/>
-                    <Tooltip />
+                    <Tooltip contentStyle={{fontSize: "12px"}}/>
                     <Legend wrapperStyle={{fontSize: "14px"}}/>
-                    <Bar dataKey="Day" fill="hsl(var(--primary))" name="Day Shift Weft" />
-                    <Bar dataKey="Night" fill="hsl(var(--accent))" name="Night Shift Weft" />
+                    <Bar dataKey="weft" fill="hsl(var(--primary))" name="Total Weft (m)" />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -288,5 +302,7 @@ export default function Dashboard() {
     </div>
   );
 }
+
+    
 
     
