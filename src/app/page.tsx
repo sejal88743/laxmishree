@@ -126,23 +126,16 @@ export default function Dashboard() {
   }, [records, settings.lowEfficiencyThreshold, today]);
   
   const chartData = useMemo(() => {
-    const data: { name: string, Day: number, Night: number }[] = [];
-    const machineNumbers = Array.from({ length: settings.totalMachines || 0 }, (_, i) => `M ${i + 1}`);
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const last30DaysRecords = records.filter(r => new Date(r.date) >= thirtyDaysAgo);
 
-    machineNumbers.forEach(machineName => {
-      const machineNo = machineName.split(' ')[1];
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      
-      const machineRecords = records.filter(r => r.machineNo === machineNo && new Date(r.date) >= thirtyDaysAgo);
+    const dayWeft = last30DaysRecords.filter(r => r.shift === 'Day').reduce((acc, r) => acc + r.weftMeter, 0);
+    const nightWeft = last30DaysRecords.filter(r => r.shift === 'Night').reduce((acc, r) => acc + r.weftMeter, 0);
 
-      const dayWeft = machineRecords.filter(r => r.shift === 'Day').reduce((acc, r) => acc + r.weftMeter, 0);
-      const nightWeft = machineRecords.filter(r => r.shift === 'Night').reduce((acc, r) => acc + r.weftMeter, 0);
-
-      data.push({ name: machineName, Day: dayWeft, Night: nightWeft });
-    });
-    return data;
-  }, [records, settings.totalMachines]);
+    return [{ name: 'Total Weft (Last 30 Days)', Day: dayWeft, Night: nightWeft }];
+  }, [records]);
 
 
   const handleWhatsAppShare = () => {
@@ -269,36 +262,18 @@ export default function Dashboard() {
           <div>
             <Card className="shadow-lg">
               <CardHeader>
-                <CardTitle className="text-lg font-semibold text-primary text-center">Day Shift Performance (Last 30 Days)</CardTitle>
+                <CardTitle className="text-lg font-semibold text-primary text-center">Shift Performance (Last 30 Days)</CardTitle>
               </CardHeader>
               <CardContent className="p-0">
-                <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={chartData} margin={{ top: 5, right: 0, left: 0, bottom: 5 }}>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={chartData} margin={{ top: 20, right: 20, left: -10, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" fontSize={10} />
-                    <YAxis fontSize={10} />
+                    <XAxis dataKey="name" fontSize={12} />
+                    <YAxis fontSize={12}/>
                     <Tooltip />
-                    <Legend wrapperStyle={{fontSize: "12px"}}/>
-                    <Bar dataKey="Day" fill="hsl(var(--primary))" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </div>
-          <div>
-            <Card className="shadow-lg">
-              <CardHeader>
-                <CardTitle className="text-lg font-semibold text-primary text-center">Night Shift Performance (Last 30 Days)</CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={chartData} margin={{ top: 5, right: 0, left: 0, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" fontSize={10} />
-                    <YAxis fontSize={10} />
-                    <Tooltip />
-                    <Legend wrapperStyle={{fontSize: "12px"}}/>
-                    <Bar dataKey="Night" fill="hsl(var(--accent))" />
+                    <Legend wrapperStyle={{fontSize: "14px"}}/>
+                    <Bar dataKey="Day" fill="hsl(var(--primary))" name="Day Shift Weft" />
+                    <Bar dataKey="Night" fill="hsl(var(--accent))" name="Night Shift Weft" />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
