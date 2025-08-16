@@ -204,7 +204,7 @@ export default function Dashboard() {
                         </Button>
                     </div>
                     <AlertDescription className="mt-2 text-sm">
-                        <div className='w-full max-w-[30%]'>
+                        <div className='w-full'>
                             <Table className="text-xs">
                             <TableHeader>
                                 <TableRow className='text-red-900'>
