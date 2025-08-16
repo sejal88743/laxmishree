@@ -9,11 +9,12 @@ import { Calendar } from '@/components/ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter as TFoot } from '@/components/ui/table';
 import { Calendar as CalendarIcon, Printer, ArrowUpDown } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 import { useAppState } from '@/hooks/use-app-state';
 import { processRecord } from '@/lib/calculations';
 import type { CalculatedLoomRecord } from '@/lib/types';
+import { cn } from '@/lib/utils';
 
 type SortKey = keyof CalculatedLoomRecord | 'lossPrd';
 type SortDirection = 'asc' | 'desc';
@@ -31,6 +32,12 @@ export default function ReportPage() {
   const componentRef = useRef<HTMLDivElement>(null);
   const handlePrint = useReactToPrint({
     content: () => componentRef.current,
+     pageStyle: `
+      @page {
+        size: A4;
+        margin: 0.5in;
+      }
+    `
   });
 
   const filteredRecords = useMemo(() => {
@@ -99,56 +106,61 @@ export default function ReportPage() {
     return sortConfig.direction === 'asc' ? '▲' : '▼';
   }
 
+  const tableHeaders: { key: SortKey; label: string; className: string }[] = [
+      { key: 'date', label: 'Date', className: 'text-gray-700' },
+      { key: 'time', label: 'Time', className: 'text-gray-700' },
+      { key: 'machineNo', label: 'M/C', className: 'text-purple-600' },
+      { key: 'stops', label: 'Stops', className: 'text-orange-600' },
+      { key: 'weftMeter', label: 'Weft', className: 'text-teal-600' },
+      { key: 'efficiency', label: 'Eff(%)', className: 'text-green-600' },
+      { key: 'lossPrd', label: 'LossPrd', className: 'text-red-700' }
+  ];
+  
+  const cellPadding = "p-1";
+
+
   const renderTableForShift = (data: CalculatedLoomRecord[], shift: 'Day' | 'Night') => {
     const shiftData = data.filter(r => r.shift === shift);
-    if(shiftData.length === 0) return null;
+    if(shiftData.length === 0) return <div className="w-1/2 p-1"><Card className='h-full'><CardContent className='flex items-center justify-center h-full text-muted-foreground'>No records for {shift} shift</CardContent></Card></div>;
 
     const totalWeft = shiftData.reduce((sum, r) => sum + r.weftMeter, 0);
     const totalLossPrd = shiftData.reduce((sum, r) => sum + r.lossPrd, 0);
     
-    const tableHeaders: { key: SortKey; label: string; }[] = [
-        { key: 'time', label: 'Time' },
-        { key: 'machineNo', label: 'M/C' },
-        { key: 'stops', label: 'Stops' },
-        { key: 'weftMeter', label: 'Weft' },
-        { key: 'efficiency', label: 'Eff(%)' },
-        { key: 'lossPrd', label: 'Loss Prd' }
-    ];
-
     return (
-        <div className="mb-4 print-card">
-            <h4 className="font-semibold text-sm mb-1 text-primary">{shift} Shift</h4>
-            <Table className="text-xs print-table">
+        <div className="w-1/2 p-1 print-card">
+            <h4 className="font-semibold text-center text-sm mb-1 text-primary">{shift} Shift</h4>
+            <Table className="text-[10px] print-table">
                 <TableHeader>
                     <TableRow>
                         {tableHeaders.map(({ key, label }) => (
-                            <TableHead key={key}>
-                                <Button variant="ghost" onClick={() => requestSort(key)} className="p-0 h-auto text-xs font-bold hover:bg-transparent no-print">
+                            <TableHead key={key} className={cellPadding}>
+                                <Button variant="ghost" onClick={() => requestSort(key)} className="p-0 h-auto text-[10px] font-bold hover:bg-transparent no-print">
                                     {label} {getSortIcon(key)}
                                 </Button>
-                                <span className="print-only">{label}</span>
+                                <span className="print-only font-bold">{label}</span>
                             </TableHead>
                         ))}
                     </TableRow>
                 </TableHeader>
                 <TableBody>
                     {shiftData.map(r => (
-                        <TableRow key={r.id}>
-                            <TableCell>{r.time}</TableCell>
-                            <TableCell>{r.machineNo}</TableCell>
-                            <TableCell>{r.stops}</TableCell>
-                            <TableCell>{r.weftMeter.toFixed(1)}</TableCell>
-                            <TableCell>{r.efficiency.toFixed(2)}</TableCell>
-                            <TableCell>{r.lossPrd.toFixed(2)}</TableCell>
+                        <TableRow key={r.id} className="font-bold">
+                            <TableCell className={cn(cellPadding, 'text-gray-700')}>{format(parseISO(r.date), 'dd/MM')}</TableCell>
+                            <TableCell className={cn(cellPadding, 'text-gray-700')}>{r.time}</TableCell>
+                            <TableCell className={cn(cellPadding, 'text-purple-600')}>{r.machineNo}</TableCell>
+                            <TableCell className={cn(cellPadding, 'text-orange-600')}>{r.stops}</TableCell>
+                            <TableCell className={cn(cellPadding, 'text-teal-600')}>{r.weftMeter.toFixed(1)}</TableCell>
+                            <TableCell className={cn(cellPadding, 'text-green-600')}>{r.efficiency.toFixed(2)}</TableCell>
+                            <TableCell className={cn(cellPadding, 'text-red-700')}>{r.lossPrd.toFixed(2)}</TableCell>
                         </TableRow>
                     ))}
                 </TableBody>
                 <TFoot>
-                    <TableRow>
-                        <TableCell colSpan={3} className="font-bold">Total</TableCell>
-                        <TableCell className="font-bold">{totalWeft.toFixed(2)}</TableCell>
+                    <TableRow className="font-bold bg-primary/10 text-primary">
+                        <TableCell colSpan={4} className={cellPadding}>Total</TableCell>
+                        <TableCell className={cellPadding}>{totalWeft.toFixed(2)}</TableCell>
                         <TableCell></TableCell>
-                        <TableCell className="font-bold">{totalLossPrd.toFixed(2)}</TableCell>
+                        <TableCell className={cellPadding}>{totalLossPrd.toFixed(2)}</TableCell>
                     </TableRow>
                 </TFoot>
             </Table>
@@ -207,7 +219,7 @@ export default function ReportPage() {
 
       <div ref={componentRef} className="print-container">
         <Card>
-          <CardHeader>
+          <CardHeader className='p-2'>
             <CardTitle className="text-center text-xl font-bold text-primary">Laxmi Shree Efficiency Report</CardTitle>
             <p className="text-center text-sm text-muted-foreground">
               {dateRange?.from && format(dateRange.from, 'dd/MM/yyyy')} - {dateRange?.to && format(dateRange.to, 'dd/MM/yyyy')}
@@ -216,17 +228,19 @@ export default function ReportPage() {
               {machineFilter !== 'all' && `Machine: ${machineFilter}`} {shiftFilter !== 'all' && `Shift: ${shiftFilter}`}
              </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className='p-2'>
             {groupedRecords.map(([date, dateRecords]) => (
-              <div key={date} className="mb-6">
-                <h3 className="text-lg font-bold my-2 p-2 bg-muted rounded-md">{format(new Date(date), 'EEEE, dd MMMM yyyy')}</h3>
-                {renderTableForShift(dateRecords, 'Day')}
-                {renderTableForShift(dateRecords, 'Night')}
+              <div key={date} className="mb-4 p-2 border rounded-md">
+                <h3 className="text-lg text-center font-bold my-1 p-1 bg-muted rounded-md">{format(parseISO(date), 'EEEE, dd MMMM yyyy')}</h3>
+                <div className="flex -m-1">
+                    {renderTableForShift(dateRecords, 'Day')}
+                    {renderTableForShift(dateRecords, 'Night')}
+                </div>
               </div>
             ))}
-             {groupedRecords.length === 0 && <p className="text-center text-muted-foreground">No records found for the selected filters.</p>}
+             {groupedRecords.length === 0 && <p className="text-center text-muted-foreground py-10">No records found for the selected filters.</p>}
           </CardContent>
-          <CardFooter className="flex justify-end flex-wrap gap-4">
+          <CardFooter className="flex justify-end flex-wrap gap-4 p-2">
               <div className="text-lg font-bold text-primary p-2 rounded-md bg-primary/10">
                   Grand Total Loss Prd: {grandTotalLossPrd.toFixed(2)}
               </div>
