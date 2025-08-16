@@ -42,7 +42,7 @@ export default function ReportPage() {
     reportElement.classList.add('pdf-generation');
 
     const canvas = await html2canvas(reportElement, {
-        scale: 2,
+        scale: 2, // Higher scale for better quality
         useCORS: true,
         logging: false,
     });
@@ -58,24 +58,29 @@ export default function ReportPage() {
 
     const pdfWidth = pdf.internal.pageSize.getWidth();
     const pdfHeight = pdf.internal.pageSize.getHeight();
+    
     const canvasWidth = canvas.width;
     const canvasHeight = canvas.height;
     
+    // Calculate the aspect ratio
     const ratio = canvasWidth / canvasHeight;
     let imgHeight = pdfWidth / ratio;
-    let imgHeightInPdf = imgHeight;
-    let position = 0;
     
-    pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeightInPdf);
-    let remainingHeight = imgHeight - pdfHeight;
+    // If the content is taller than the page, it needs to be split
+    let heightLeft = imgHeight;
+    let position = 0;
 
-    while (remainingHeight > 0) {
-        position -= pdfHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeightInPdf);
-        remainingHeight -= pdfHeight;
+    // Add first page
+    pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
+    heightLeft -= pdfHeight;
+
+    // Add new pages if content is longer than one page
+    while (heightLeft > 0) {
+      position = heightLeft - imgHeight; // Set top of image for the new page
+      pdf.addPage();
+      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
+      heightLeft -= pdfHeight;
     }
-
 
     const fromDate = dateRange?.from ? format(dateRange.from, 'dd-MM-yy') : 'start';
     const toDate = dateRange?.to ? format(dateRange.to, 'dd-MM-yy') : 'end';
@@ -168,13 +173,13 @@ export default function ReportPage() {
 
   const renderTableForShift = (data: CalculatedLoomRecord[], shift: 'Day' | 'Night') => {
     const shiftData = data.filter(r => r.shift === shift);
-    if(shiftData.length === 0) return <div className="w-1/2 p-1 print-card"><Card className='h-full'><CardContent className='flex items-center justify-center h-full text-muted-foreground'>No records for {shift} shift</CardContent></Card></div>;
+    if(shiftData.length === 0) return <div className="w-full p-1 print-card"><Card className='h-full'><CardContent className='flex items-center justify-center h-full text-muted-foreground'>No records for {shift} shift</CardContent></Card></div>;
 
     const totalWeft = shiftData.reduce((sum, r) => sum + r.weftMeter, 0);
     const totalLossPrd = shiftData.reduce((sum, r) => sum + r.lossPrd, 0);
     
     return (
-        <div className="w-1/2 p-1 print-card">
+        <div className="w-full p-1 print-card">
             <h4 className="font-semibold text-center text-sm mb-1 text-primary">{shift} Shift</h4>
             <Table className="text-[10px] print-table">
                 <TableHeader>

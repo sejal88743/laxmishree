@@ -75,6 +75,9 @@ body {
 .print-only {
   display: none;
 }
+.no-print .print-only {
+    display: none !important;
+}
 
 @media print {
   body {
@@ -95,7 +98,7 @@ body {
   .print-card {
     border: 1px solid #ccc;
     page-break-inside: avoid;
-    width: 50%;
+    width: 100%; /* For portrait side-by-side */
   }
   .print-table {
     width: 100%;
@@ -106,6 +109,9 @@ body {
   }
   .print-only {
     display: table-row !important;
+  }
+  .print-shifts-container {
+      flex-direction: column; /* Stack shifts vertically */
   }
 }
 
@@ -119,9 +125,9 @@ body {
     }
 }
 .pdf-generation .print-table {
-    font-size: 8px;
+    font-size: 8px; /* Further reduced font size for PDF */
 }
 .pdf-generation .print-table th,
 .pdf-generation .print-table td {
-    padding: 2px;
+    padding: 2px; /* Further reduced padding for PDF */
 }
