@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { LayoutDashboard, ListPlus, FileText, SettingsIcon, Wifi, WifiOff, Loader2 } from 'lucide-react';
 import { useAppState } from '@/hooks/use-app-state';
 import { cn } from '@/lib/utils';
+import Image from 'next/image';
 
 const navItems = [
   { href: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -50,7 +51,7 @@ export function Nav() {
     <header className="sticky top-0 z-50 w-full border-b bg-primary shadow-lg no-print">
       <div className="container flex h-14 max-w-screen-2xl items-center justify-between px-2">
         <Link href="/" className="mr-6 flex items-center space-x-2">
-          <span className="font-bold text-primary-foreground">Laxmi Shree</span>
+          <Image src="/logo.png" alt="Laxmi Shree Logo" width={140} height={40} className="object-contain" />
         </Link>
         <div className="flex items-center gap-2">
           <TooltipProvider>
