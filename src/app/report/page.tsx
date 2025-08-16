@@ -38,11 +38,8 @@ export default function ReportPage() {
     if (!reportElement) return;
 
     setIsGenerating(true);
-
-    reportElement.classList.add('pdf-generation');
     
-    const originalStyle = reportElement.style.overflow;
-    reportElement.style.overflow = 'visible';
+    reportElement.classList.add('pdf-generation');
 
     const canvas = await html2canvas(reportElement, {
         scale: 2,
@@ -50,37 +47,32 @@ export default function ReportPage() {
         logging: false,
     });
     
-    reportElement.style.overflow = originalStyle;
     reportElement.classList.remove('pdf-generation');
     
     const imgData = canvas.toDataURL('image/png');
     const pdf = new jsPDF({
-        orientation: 'landscape',
+        orientation: 'portrait',
         unit: 'mm',
         format: 'a4'
     });
 
     const pdfWidth = pdf.internal.pageSize.getWidth();
     const pdfHeight = pdf.internal.pageSize.getHeight();
-    const imgWidth = canvas.width;
-    const imgHeight = canvas.height;
-    const ratio = imgWidth / imgHeight;
-    const newImgHeight = pdfWidth / ratio;
-
-    let height = newImgHeight;
+    const canvasWidth = canvas.width;
+    const canvasHeight = canvas.height;
+    
+    const ratio = canvasWidth / canvasHeight;
+    let imgHeight = pdfWidth / ratio;
+    let imgHeightInPdf = imgHeight;
     let position = 0;
     
-    if (newImgHeight > pdfHeight) {
-        height = pdfHeight;
-    }
-
-    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, height);
-    let remainingHeight = newImgHeight - pdfHeight;
+    pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeightInPdf);
+    let remainingHeight = imgHeight - pdfHeight;
 
     while (remainingHeight > 0) {
         position -= pdfHeight;
         pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, newImgHeight);
+        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeightInPdf);
         remainingHeight -= pdfHeight;
     }
 
@@ -176,7 +168,7 @@ export default function ReportPage() {
 
   const renderTableForShift = (data: CalculatedLoomRecord[], shift: 'Day' | 'Night') => {
     const shiftData = data.filter(r => r.shift === shift);
-    if(shiftData.length === 0) return <div className="w-1/2 p-1"><Card className='h-full'><CardContent className='flex items-center justify-center h-full text-muted-foreground'>No records for {shift} shift</CardContent></Card></div>;
+    if(shiftData.length === 0) return <div className="w-1/2 p-1 print-card"><Card className='h-full'><CardContent className='flex items-center justify-center h-full text-muted-foreground'>No records for {shift} shift</CardContent></Card></div>;
 
     const totalWeft = shiftData.reduce((sum, r) => sum + r.weftMeter, 0);
     const totalLossPrd = shiftData.reduce((sum, r) => sum + r.lossPrd, 0);
@@ -295,7 +287,7 @@ export default function ReportPage() {
             {groupedRecords.map(([date, dateRecords]) => (
               <div key={date} className="mb-4 p-2 border rounded-md">
                 <h3 className="text-lg text-center font-bold my-1 p-1 bg-muted rounded-md">{format(parseISO(date), 'EEEE, dd MMMM yyyy')}</h3>
-                <div className="flex -m-1">
+                <div className="flex -m-1 print-shifts-container">
                     {renderTableForShift(dateRecords, 'Day')}
                     {renderTableForShift(dateRecords, 'Night')}
                 </div>

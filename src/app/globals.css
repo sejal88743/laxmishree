@@ -109,10 +109,19 @@ body {
   }
 }
 
+.pdf-generation {
+    .print-shifts-container {
+        flex-direction: column;
+    }
+    .print-card {
+        width: 100%;
+        margin-bottom: 1rem;
+    }
+}
 .pdf-generation .print-table {
-    font-size: 10px;
+    font-size: 8px;
 }
 .pdf-generation .print-table th,
 .pdf-generation .print-table td {
-    padding: 2px 4px;
+    padding: 2px;
 }
