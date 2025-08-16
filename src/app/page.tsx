@@ -232,8 +232,8 @@ export default function Dashboard() {
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-2">
                     {Object.entries(performanceData).map(([machineNo, data]) => {
                     const trend = data.todayEfficiency - data.yesterdayEfficiency;
-                    const cardColor = data.todayEfficiency >= settings.lowEfficiencyThreshold ? 'bg-green-100 border-green-300' : data.todayEfficiency > (settings.lowEfficiencyThreshold * 0.9) ? 'bg-blue-100 border-blue-300' : 'bg-red-100 border-red-300';
-                    const textColor = data.todayEfficiency >= settings.lowEfficiencyThreshold ? 'text-green-800' : data.todayEfficiency > (settings.lowEfficiencyThreshold * 0.9) ? 'text-blue-800' : 'text-red-800';
+                    const cardColor = data.todayEfficiency >= settings.lowEfficiencyThreshold ? 'bg-green-100 border-green-300' : data.todayEfficiency > (settings.lowEfficiencyThreshold * 0.9) ? 'bg-yellow-100 border-yellow-300' : 'bg-red-100 border-red-300';
+                    const textColor = data.todayEfficiency >= settings.lowEfficiencyThreshold ? 'text-green-800' : data.todayEfficiency > (settings.lowEfficiencyThreshold * 0.9) ? 'text-yellow-800' : 'text-red-800';
 
                     return (
                         <Card key={machineNo} className={`shadow-md ${cardColor} ${textColor}`}>
